@@ -1,0 +1,509 @@
+@font-face {
+    font-family: Century-Schoolbook;
+    font-weight: normal;
+    font-style: normal;
+    src:
+        url("/server_data/server_static_resources/fonts/Century-Schoolbook/C059-BdIta.ttf");
+}
+@font-face {
+    font-family: Kenarose;
+    font-weight: normal;
+    font-style: normal;
+    src:
+        url("/server_data/server_static_resources/fonts/Kenarose/Kenarose.ttf");
+}
+
+table {
+    border-collapse:collapse;
+}
+
+img.mediumProfilePic {
+    width:min(30vw, 30vh);
+    height:min(30vw, 30vh);
+    border-radius: 50%;
+}
+
+body {
+    background-image:url('https://img.freepik.com/premium-vector/quiz-seamless-pattern-doodle-style-vector-illustration-back-school-background_501826-310.jpg?w=500');
+    background-repeat: repeat;
+    display: flex;
+    flex-direction: column;
+    justify-content: start;
+    align-items: center;
+    overflow-y: auto;
+    flex-shrink: 0;
+}
+
+body > div.page {
+    width:80%;
+    padding:5%;
+    border: solid 1px black;
+    box-sizing: border-box;
+    background-color: white;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+    overflow-x: hidden;
+    height:fit-content;
+    margin-top: 10%;
+    margin-bottom: 5%;
+}
+
+/*div.menubar > .menubarentrydropdown {
+    border-bottom-left-radius: 500px;
+    border-bottom-right-radius: 500px;
+    shape-outside:circle(50%);
+    top:0px;
+    left:0px;
+    width: 15%;
+    height:200%;
+    background-color: #000000;
+    translate: 0px calc(0% + 15vdw);
+    transition: translate 0.5s ease-out;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    align-items: center;
+}
+
+div.menubar > .menubarentrydropdown:hover {
+    translate: 0px 50%;
+}*/
+
+@media screen and (width <= 333px) {
+    div.menubar {
+        position: fixed;
+        padding:0px;
+        margin:0px;
+        top: 0px;
+        left: 0px;
+        width: 100%;
+        height: 10%;
+        z-index: 1;
+        display: flex;
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .opensidebar {
+        z-index: 3;
+        height:75%;
+        width:auto;
+        transform-origin: center;
+        transition: rotate 0.15s linear;
+    }
+
+    .opensidebar.active {
+        rotate:90deg;
+    }
+    
+    .opensidebar svg {
+        width:100%;
+        height:100%;
+    }
+
+    div.buttonsdiv {
+        position:fixed;
+        top:10%;
+        left:0px;
+        width:100%;
+        height:90%;
+        transition: translate 0.5s cubic-bezier(0.19, 1, 0.22, 1);
+        translate: -100% 0px;
+        background-color: #FFFFFF;
+        z-index:2;
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-content: flex-start;
+        overflow-y: scroll;
+    }
+
+    div.buttonsdiv.active {
+        translate: 0px 0px;
+    }
+
+    div.menubar .menubarentry {
+        width: 100%;
+        height: fit-content;
+        scale:100%;
+        padding-block: 5%;
+        border-top:groove 1px rgba(0, 0, 0, 0.4);
+        border-bottom:groove 1px rgba(0, 0, 0, 0.4);
+        transition:scale 0.1s ease-out;
+    }
+
+    div.menubar .menubarentry:hover {
+        scale:90%;
+    }
+}
+
+@media screen and (width > 333px) {
+    div.menubar {
+        position: fixed;
+        padding:0px;
+        margin:0px;
+        top: 0px;
+        left: 0px;
+        width: 100%;
+        height: fit-content;
+        z-index: 2;
+        background: linear-gradient(180deg, skyblue 0% 50%, rgba(0, 0, 0, 0) 100%);
+        display: flex;
+        flex-direction: row;
+        justify-content: flex-start;
+        align-items: center;
+    }
+
+    .opensidebar {
+        display:none;
+    }
+    
+    div.menubar .buttonsdiv {
+        display: flex;
+        flex-wrap: wrap;
+        flex-direction: row;
+        flex-grow: 1;
+    }
+    
+    div.menubar .menubarentry {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-grow:0;
+        flex-shrink: 0;
+        border:groove 3px #777777;
+        border-radius: 5px;
+        background-color: #BBBBBB;
+        padding: 5px;
+        padding:1%;
+        margin:2px;
+        width: fit-content;
+        overflow: hidden;
+        color: #000000;
+        transition: background-color 0.5s ease-out, color 0.5s ease-out;
+    }
+    
+    div.menubar .menubarentry:hover {
+        background-color: #000000;
+        color: #BBBBBB;
+    }
+}
+
+
+a.menubarentry {
+    text-decoration:none;
+}
+
+#notificationsbgdiv {
+    background-color:rgba(0, 0, 0, 0.4);
+    z-index:1;
+    top:0;
+    left:0;
+    width:100%;
+    height:100%;
+    position:fixed;
+    align-items:center;
+    justify-content: center;
+}
+
+#notificationsdiv {
+    background-color: #fefefe;
+    border: 1px solid #000000;
+    display: inline-block;
+    vertical-align: middle;
+    padding:3px;
+    position:fixed;
+    max-width:95%;
+    width:75%;
+    max-height:25%;
+    height:25%;
+}
+
+.flexColLayout {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+}
+
+.homepagetextcontainer {
+    display: flex;
+}
+
+.homepagemaintext {
+    color:#af5830;
+    font-family: Helvetica;
+    font-size: 10vmin;
+}
+
+.homepagemaintext .homepageemphasis {
+    color:#8f49c5;
+    font-weight: bold;
+}
+
+.quizHomepageImage {
+    width:75%;
+    height:auto;
+    flex-grow: 1;
+    opacity: 0.5;
+    translate:-100% 0px;
+    transition: translate 0.8s ease-out, opacity 0.7s ease-out;
+}
+
+.homepagetextcontainer {
+    opacity: 0.5;
+    translate:100% 0px;
+    transition: translate 0.8s ease-out, opacity 0.7s ease-out;
+}
+
+.quizHomepageImage.transitionIn, .homepagetextcontainer.transitionIn {
+    opacity: 1;
+    translate:0px 0px;
+}
+
+.quizHomepageContent {
+    width:100%;
+    height:fit-content;
+    justify-content: center;
+    text-align: center;
+}
+
+.accountDetails {
+    flex-shrink: 0;
+}
+
+.moreoptions {
+    border:dashed 1px black;
+    display: none;
+    opacity: 0;
+    translate: 0px -100%;
+}
+
+.moreoptions.visible {
+    display:inherit;
+    transition: translate 0.4s ease-out, opacity 0.3s ease-out;
+}
+
+.moreoptions.visible.show {
+    opacity: 1;
+    translate: 0px 0px;
+}
+
+span.content {
+    padding: 3px;
+    border:solid 1px black;
+    display:inline-block;
+    min-width:50px;
+    min-height:15px;
+}
+
+span.content:empty::before {
+    color: #777777;
+    font-family: Consolas;
+    content: "Enter your value here";
+}
+
+button.optionsinflator {
+    border-radius: 500px;
+    border:solid 1px black;
+    text-align: center;
+    vertical-align: center;
+    rotate:0deg;
+    translate:0% 0%;
+    transition: rotate 0.3s ease-in-out;
+}
+
+button.optionsinflator:active {
+    translate: 5% 5%;
+    background-color:#888888;
+}
+
+button.optionsinflator.expanded {
+    rotate: 90deg;
+}
+
+.veryImportant {
+    color:red;
+    text-decoration: underline;
+    font-style: italic;
+}
+
+.closebutton {
+    float: right;
+    background-color: rgba(0, 0, 0, 0);
+    color: rgb(0, 0, 0);
+}
+
+.closebutton:hover {
+    color: rgba(255, 255, 255, 255);
+    background-color: rgba(255, 0, 0, 255);
+}
+
+div.bgdiv {
+    background-color: rgba(0, 0, 0, 0.3);
+    position: fixed;
+    top:0px;
+    left:0px;
+    width:100%;
+    height:100%;
+    z-index: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    translate: 0px -100%;
+    scale: 0;
+    transition: translate 0.5s ease-out, scale 0.5s ease-out;
+}
+
+div.bgdiv.visible {
+    scale: 100%;
+    translate: 0px 0px;
+}
+
+div.minipage {
+    width:60%;
+    height:60%;
+    padding:5%;
+    border: solid 1px black;
+    box-sizing: border-box;
+    background-color: white;
+    flex-wrap: wrap;
+    overflow-x: hidden;
+}
+
+span.quizCodePrompt {
+    font-size: 20px;
+    font-family: Kenarose;
+    margin-bottom: 5px;
+}
+
+div.quizDescriptor {
+    border:solid 1px black;
+}
+
+div.dropdownbg {
+    top:0px;
+    left:0px;
+    height:100%;
+    width:100%;
+    position:absolute;
+    background-color:rgba(0, 0, 0, 0);
+}
+
+div.optsdropdowncontainer {
+    min-width:100px;
+    min-height:50px; 
+    position:absolute;
+    display:inline-block;
+    border:solid 1px black;
+    background-color:rgba(255, 255, 255, 255);
+    padding:2px;
+}
+
+div#quizzesframe {
+    border:solid 1px black;
+    padding:5px;
+}
+
+.dropdownlistoption {
+    color:#01C7E9;
+    background-color:#FFFFFF;
+    border:solid 1px #999999;
+    border-radius:3px;
+}
+
+.dropdownlistoption:hover {
+    color: #FFFFFF;
+    background-color: #01C7E9;
+}
+
+.fileInput {
+    display: none;
+}
+
+canvas#profilepicture {
+    width:100%;
+    height:100%;
+}
+
+.dateDisplay {
+    font-style: italic;
+    color: #888888;
+}
+
+div.page:has(> div.quizzesframe) {
+    box-sizing: border-box;
+    height: fit-content;
+    max-height: 80%;
+    overflow-y: auto;
+}
+
+div.quizzesframe {
+    width:100%;
+    height:100%;
+    max-width:100%;
+    max-height:100%;
+    overflow-y: auto;
+    overflow-x: hidden;
+    box-sizing: border-box;
+}
+
+div.headerTextContainer {
+    background-color: #8f49c5;
+    border-radius: 5px;
+    padding: 5px;
+    opacity: 0;
+    translate: -100% 0px;
+    transition: opacity 0.3s ease-out, translate 0.4s ease-out;
+}
+
+span.headerText {
+    font-family: Kenarose;
+    font-size: calc(5vw + 1px);
+    color: #01C7E9;
+    opacity: 0;
+    translate: 0px 100%;
+    transition: opacity 0.3s ease-out, translate 0.4s ease-out;
+}
+
+div.headerTextContainer.visible, span.headerText.visible {
+    opacity: 1;
+    translate: 0px 0px;
+}
+
+/*Increase element specificity beyond that of body > div.page ruleset to override its flex-wrap property*/
+body > div.page.flexColLayout {
+    flex-wrap: nowrap;
+}
+
+div.dropdowndiv {
+    position: fixed;
+    background-color:#FFFFFF;
+    border:solid 1px black;
+    z-index:1;
+    top:0px;
+    left:0px;
+    width:120px;
+    height:200px;
+}
+
+div.dropdownbgdiv {
+    display:none;
+    background-color:rgba(0, 0, 0, 0);
+    width:100%;
+    height:100%;
+    top:0px;
+    left:0px;
+    position:fixed;
+}
+
+.dropdownmenuoption {
+    background-color: rgb(255, 255, 255);
+    color: rgb(37, 191, 223);
+}
+
+.dropdownmenuoption:hover {
+    background-color: #25BFDF;
+    color: #FFFFFF;
+}

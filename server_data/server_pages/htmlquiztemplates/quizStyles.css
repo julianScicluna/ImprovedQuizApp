@@ -1,0 +1,488 @@
+@keyframes countdownNumber {
+	0% {
+		translate: 0px -200px;
+		scale:25%;
+	}
+	100% {
+		translate: 0 0;
+		scale: 100%;
+	}
+}
+
+@keyframes countdownNumberGO {
+	0% {
+		scale:25%;
+	}
+	75% {
+		scale: 125%;
+		rotate:20deg;
+	}
+	100% {
+		scale: 100%;
+	}
+}
+
+@keyframes countdownPulse {
+	0% {
+		scale:100%;
+		/*background-color:rgba(74, 56, 213, 1.0);*/
+	}
+	100% {
+		scale:300%;
+		/*background-color:rgba(74, 56, 213, 0.0);*/
+	}
+}
+
+@keyframes answerOptionBounce {
+	0% {
+		scale:100%;
+		box-shadow: 10px 10px 5px gray;
+	}
+	100% {
+		scale:110%;
+		box-shadow: 15px 15px 7px gray;
+	}
+}
+@keyframes answerOptionBounceReverse {
+	0% {
+		scale:110%;
+		box-shadow: 15px 15px 7px gray;
+	}
+	100% {
+		scale:100%;
+		box-shadow: 10px 10px 5px gray;
+	}
+}
+
+
+@keyframes answerOptionShrink {
+	0% {
+		scale:110%;
+		box-shadow: 15px 15px 7px gray;
+	}
+	100% {
+		scale:85%;
+		box-shadow: 7px 7px 4px gray;
+	}
+}
+@keyframes answerOptionShrinkReverse {
+	0% {
+		scale:85%;
+		box-shadow: 7px 7px 4px gray;
+	}
+	100% {
+		scale:100%;
+		box-shadow: 10px 10px 5px gray;
+	}
+}
+
+@keyframes submitFlash {
+	0% {
+		background-position: 0% 0%;
+	}
+	100% {
+		background-position: 100% 100%;
+	}
+}
+
+.animatedCountdownPulse {
+	animation-duration: 1s;
+	animation-name: countdownPulse;
+	animation-timing-function: cubic-bezier(0.19, 1, 0.22, 1);
+	animation-fill-mode: forwards;
+	display: inline-block;
+	shape-outside: circle(50% at 50% 50%);
+	clip-path:circle(50% at 50% 50%);
+	background: radial-gradient(rgba(0.0, 0.0, 0.0, 0.0) 0% 25%, rgba(74, 56, 213, 1.0) 100%);
+	width:100px;
+	height:100px;
+}
+
+.animatedStartNumber {
+	color: white;
+	animation-duration: 0.8s;
+	animation-name: countdownNumber;
+	animation-timing-function: ease-in-out;
+	animation-fill-mode: forwards;
+	display: inline-block;
+	position: absolute;
+	font-size: 50px;
+}
+
+.animatedStartNumber.go {
+	animation-timing-function: ease-out;
+	animation-name:countdownNumberGO;
+}
+
+/*Div on which to position the quiz start animation*/
+div.animationPositioningdiv {
+	position:fixed;
+	width:100%;
+	height:100%;
+	top:0px;
+	left:0px;
+	display:flex;
+	justify-content:center;
+	align-items:center;
+}
+
+div.answerOption {
+	border-radius: 10px;
+	box-shadow: 10px 10px 5px gray;
+	width:34%;
+	height:34%;
+	padding:3%;
+	margin:5%;
+	user-select: none;
+	text-wrap: wrap;
+	overflow-y: auto;
+	white-space: normal;
+	word-wrap:break-word;
+	display:flex;
+	justify-content: center;
+	align-items: center;
+}
+
+@media screen and (aspect-ratio > 1) {
+}
+
+/*Make answer options allocate the width of two, so that they would be scrollable and of reasonable size*/
+@media screen and (aspect-ratio < 1) {
+	div.answerOption {
+		width:84%;
+	}
+}
+
+div.answerOption.responsive:hover {
+	animation-name: answerOptionBounce;
+	animation-duration: 0.4s;
+	animation-timing-function: ease-out;
+	animation-direction: normal;
+	animation-fill-mode: forwards;
+}
+
+textarea.answerTextField {
+	min-width: 20%;
+	min-height: 10%;
+
+	max-width: 100%;
+	max-height: 100%;
+}
+
+div.submitButton {
+	border-radius: 500px;
+	background: rgba(0, 0, 0, 0);
+	display: flex;
+	padding:3px;
+	justify-content: center;
+	align-items: center;
+}
+
+div.submitButton div:first-child {
+	display:block;
+	color:white;
+	background-color: black;
+	border-radius: 500px;
+	flex-shrink: 0;
+	padding:5px;
+}
+
+div.submitButton:hover {
+	background-image: repeating-linear-gradient(45deg, red 0% 20%, lime 40% 60%, blue 80% 100%);
+	background-size: 400% 400%;
+	animation-name: submitFlash;
+	animation-timing-function: ease-in-out;
+	animation-duration: 1s;
+	animation-fill-mode: forwards;
+}
+
+div.textOptionAnswerDiv {
+	display: flex;
+	flex-direction: column;
+	perspective: inherit;
+	transform-style: inherit;
+	transform-origin: 0% 100% 0%;
+	max-width: 50%;
+	max-height: 50%;
+}
+
+div.textOptionAnswerDiv > textarea.answerTextField {
+	display:flex;
+	flex-grow: 0;
+	flex-shrink: 1;
+	flex-basis:auto;
+}
+
+div.textOptionAnswerDiv > div.submitButton {
+	flex-grow: 0;
+	flex-shrink: 1;
+	flex-basis:auto;
+	align-self: flex-end;
+}
+
+/*div.answerOption.answerOptionClicked {
+	animation-name: answerOptionShrink;
+	animation-duration: 0.5s;
+	animation-timing-function:ease-out;
+	animation-direction: normal;
+}*/
+/*To be deleted on animation completion*/
+/*div.answerOption.answerOptionReleased {
+	animation-name: answerOptionShrinkReverse;
+	animation-duration: 0.5s;
+	animation-timing-function:ease-out;
+	animation-direction: normal;
+}*/
+div.answerOption.responsive:not(:hover) {
+	animation-name: answerOptionBounceReverse;
+	animation-duration: 0.4s;
+	animation-timing-function: ease-out;
+	animation-fill-mode: forwards;
+	animation-direction: forwards;
+}
+
+body {
+	background-color: rgb(0, 0, 89);
+	/*display: flex;
+	flex-direction: column;
+	flex-wrap: wrap;
+	justify-content: center;
+	align-items: center;*/
+}
+
+div#quizDiv {
+	width: 100%;
+	height: 100%;
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	align-items: center;
+	font-family:Century-Schoolbook;
+}
+
+.contentDiv {
+	overflow-y: auto;
+	border-radius: 10px;
+	background-color: darkblue;
+	display: flex;
+	justify-content: center;
+	align-items: center;
+
+	margin:5vh;
+	width: 90%;
+	/*height: 40%;*/
+}
+
+div#questionDiv {
+	flex-grow:1;
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	margin-bottom:2.5vh;
+}
+
+div#answersDiv {
+	flex-grow:2;
+	/*max-height: 70%;*/
+	max-height: 50vh;
+	margin-top:2.5vh;
+	flex-wrap: wrap;
+	perspective: 1000px;
+	transform-style: preserve-3d;
+}
+
+span.question {
+	text-align:center;
+}
+
+progress.progressBar {
+	position:fixed;
+	z-index: 2;
+	top:5px;
+	left: 10%;
+	width:80%;
+	/*A little hacky and franky ugly solution to get rounded corners by setting the border-radius attrubite to an arbitrary, high value*/
+	border-radius:500px;
+	border:3px solid #6b809d;
+}
+progress.progressBar::-moz-progress-bar {
+	background-color: rgb(64, 64, 64);
+	/*A little hacky and franky ugly solution to get rounded corners by setting the border-radius attrubite to an arbitrary, high value*/
+	border-radius:500;
+}
+
+progress.progressBar::-webkit-progress-bar {
+	background-color: rgb(64, 64, 64);
+	/*A little hacky and franky ugly solution to get rounded corners by setting the border-radius attrubite to an arbitrary, high value*/
+	border-radius:500px;
+}
+
+progress.progressBar::-webkit-progress-value {
+	background: repeating-linear-gradient(45deg, blue 0px 10px, lime 10px 20px, red 20px 30px, yellow 30px 40px);
+	/*A little hacky and franky ugly solution to get rounded corners by setting the border-radius attribute to an arbitrary, high value*/
+	border-radius:500px;
+}
+
+.content {
+	font-size:30px;
+	color: white;
+	display: inline-block;
+}
+
+.mediumContent {
+	font-size:20px;
+	color: white;
+	display: inline-block;
+}
+
+.smallContent {
+	font-size:15px;
+	color: white;
+	display: inline-block;
+}
+
+.smallContent.dark, .mediumContent.dark, .content.dark {
+	color: black;
+}
+
+.styledIndicator {
+	font-style: italic;
+	color: #666666;
+}
+
+div.postQuestionRemark {
+	width: 100%;
+	height: 100%;
+	top:0px;
+	left:0px;
+	position:fixed;
+	z-index:2;
+	translate: 0% -100%;
+	display:flex;
+	flex-direction: column;
+	justify-content: center;
+	align-items:center;
+	transition: translate 1s cubic-bezier(0.075, 0.82, 0.165, 1);
+}
+
+div.postQuestionRemark.transition {
+	translate: 0% 0%;
+}
+
+div.answerSlider {
+	border-radius: 25px;
+	width:75%;
+	height:50%;
+	display: flex;
+	flex-direction: column;
+	justify-content: flex-start;
+	align-items: center;
+}
+
+svg.answerSVG {
+	margin: 25px;
+}
+
+span.newPointsSpan {
+	padding:3px;
+	border-radius: 3px;
+	opacity: 0;
+	translate: 0% 100%;
+	font-size: 10px;
+	color: #FFFFFF;
+	background-color: rgb(74, 0, 99);
+	transition: translate 0.75s ease-out, opacity 0.75s ease-out;
+}
+
+span.newPointsSpan.visibleState {
+	opacity: 1;
+	translate: 0% -100%;
+}
+
+.quizHeading {
+	display: flex;
+	flex-direction: row;
+	margin:5vh;
+	margin-bottom: 0px;
+	width: 90%;
+	justify-content: space-around;
+	align-items: normal;
+}
+
+#quizTitle {
+	/*max-width:40%;*/
+	max-height:calc((0.25rem + 3vw) * 1.5);
+	font-size:calc(0.25rem + 3vw);
+	font-family: Kenarose;
+	overflow: hidden;
+}
+
+#questionsRatio {
+	font-size:calc(0.5rem + 3vw);
+}
+
+div.quizReady {
+	background-color: yellowgreen;
+	display:flex;
+	justify-content: center;
+	align-items: center;
+	position:fixed;
+	width: 100%;
+	height: 100%;
+	top:0px;
+	left:0px;
+	z-index:2;
+	translate: -100% 0%;
+	transition: translate 1s ease-out;
+}
+div.quizReady.transitionPhase1 {
+	translate:0% 0%;
+	transition: translate 1s ease-in;
+}
+div.quizReady.transitionPhase2 {
+	translate:100% 0%;
+}
+
+span.quizReady {
+	color: white;
+	font-size: 30px;
+}
+
+div.resultsContainer {
+	width:70%;
+	height:70%;
+	background-color: #FFFFFF;
+	border: groove 3px yellow;
+	display: flex;
+	padding: 5%;
+	flex-direction: column;
+	align-items: center;
+	justify-content:space-around;
+}
+
+div.resultsContainerBG {
+	position:fixed;
+	top:0px;
+	left:0px;
+	width:100%;
+	height:100%;
+	background-color: rgba(0, 0, 0, 0.4);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+div.warningPopup {
+	background-color: white;
+	border: solid 1px black;
+	opacity: 0;
+	translate: 0% 0%;
+	z-index: 2;
+	transition: opacity 0.4s ease-out, translate 0.4s ease-out;
+	position: absolute;
+}
+
+div.warningPopup.visibleState {
+	opacity:1;
+	translate: 0% -100%;
+}

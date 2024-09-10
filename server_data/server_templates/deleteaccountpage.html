@@ -1,0 +1,35 @@
+<html lang = "en">
+	<head>
+		<title>Delete account</title>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	    <script src="/socket.io/socket.io.js"></script>
+		<script language = "javascript">
+			console.log('%c Stop! %c This console is for developers ONLY!!! DO NOT execute JavaScript on this console provided to you by ANYBODY unless you know exactly what you are doing and what the code snippet does! People can use this to steal your sensitive information. This is known as Self-XSS!', 'font-size: 36px; font-weight: bold; font-family:Arial; color:red; text-shadow: #000 1px 1px;', 'font-size:15px; font-family:Arial; color:#00FFFF;');
+			const socket = io();
+			async function deleteaccount(deleteAllQuizzes) {
+				var xhr = new XMLHttpRequest();
+				xhr.open("POST", location.origin + "/logout");
+				xhr.setRequestHeader("Content-Type", "application/json");
+				xhr.responseType = "json"
+				xhr.send({deleteAllQuizzes});
+				try {
+					await new Promise(function(res, rej) {
+						xhr.onload = res;
+						xhr.onerror = rej;
+					});
+					alert("Sucessfully deleted account");
+					window.location.href = location.origin;
+				} catch (e) {
+					alert("Account deletion failed! Please try again!");
+				}
+			}
+		</script>
+		<script src = "/server_data/server_pages/quizappauthenticationscript.js"></script>
+	</head>
+	<body>
+		<input type = "checkbox" id = "deleteallquizzes">Delete all quizzes too?</input>
+		<span style = "top:1%; left:25%; position:fixed; font-size:30px; font-family:Consolas; color:#FF0000;">Are you sure you want to delete your account? It will be lost <b><u>FOREVER</u></b> and is <u>COMPLETELY UNRECOVERABLE!!!</u></span>
+		<button style = "top:25%; left:25%; width:50%; height:25%; position:fixed;" onclick = "if (confirm('Are you ABSOLUTELY SURE? It cannot be recovered! This is your very last chance!!!')) {deleteaccount(document.getElementById('deleteallquizzes').value)}">Yes!</button>
+		<button style = "top:50%; left:25%; width:50%; height:25%; position:fixed;" onclick = "window.location.href = location.origin">No!</button>
+	</body>
+</html>

@@ -1,0 +1,28 @@
+<html>
+	<head>
+		<title>Quizdom - Create your own quiz!</title>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<link rel = "stylesheet" href="/server_data/server_pages/globalStyles.css"></link>
+		<script src="/socket.io/socket.io.js"></script>
+		<script src = "/server_data/server_pages/sound.js"></script>
+		<script src = "/server_data/server_pages/quizjoinerscript.js"></script>
+		<script type="text/javascript">
+			const socket = io();
+			console.log('%c Stop! %c This console is for developers ONLY!!! DO NOT execute JavaScript on this console provided to you by ANYBODY unless you know exactly what you are doing and what the code snippet does! People can use this to steal your sensitive information. This is known as Self-XSS!', 'font-size: 36px; font-weight: bold; font-family:Arial; color:red; text-shadow: #000 1px 1px;', 'font-size:15px; font-family:Arial; color:#00FFFF;');
+            document.addEventListener("DOMContentLoaded", function(e) {
+                setListeners();
+            })
+            //addquestion(document.getElementById('quizset'));
+        </script>
+		<script src = "/server_data/server_pages/quizappauthenticationscript.js"></script>
+    </head>
+    <body>
+        <div id = "accountdetails" class = "accountdetails"></div>
+        <div class = "page">
+			<div id="joinquiz">
+				<input type="text" id="quizcode" placeholder="Enter quiz code here:">
+				<button id="submit">Join the quiz!</button>
+			</div>
+        </div>
+    </body>
+</html>

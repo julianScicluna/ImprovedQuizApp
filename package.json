@@ -1,0 +1,23 @@
+{
+  "name": "nodejsmysqlapp",
+  "version": "1.0.0",
+  "description": "Trying to use MySQL with NodeJS",
+  "main": "index.js",
+  "gypfile": true,
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "nodemon index.js",
+    "build": "node-gyp rebuild",
+    "clean": "node-gyp clean"
+  },
+  "author": "Julian Scicluna",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.19.2",
+    "mysql": "^2.18.1",
+    "node-addon-api": "^8.1.0",
+    "node-gyp": "^10.2.0",
+    "nodejsmysqlapp": "file:",
+    "nodemon": "^3.1.4"
+  }
+}

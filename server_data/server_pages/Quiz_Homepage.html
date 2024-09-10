@@ -1,0 +1,174 @@
+<html>
+	<head>
+		<title>Quizdom!</title>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<link rel = "stylesheet" href="/server_data/server_pages/globalStyles.css"></link>
+		<script src="/socket.io/socket.io.js"></script>
+		<script src = "/server_data/server_pages/modal/modal.js"></script>
+		<script type="text/javascript">
+			const socket = io();
+			console.log('%c Stop! %c This console is for developers ONLY!!! DO NOT execute JavaScript on this console provided to you by ANYBODY unless you know exactly what you are doing and what the code snippet does! People can use this to steal your sensitive information. This is known as Self-XSS!', 'font-size: 36px; font-weight: bold; font-family:Arial; color:red; text-shadow: #000 1px 1px;', 'font-size:15px; font-family:Arial; color:#00FFFF;');
+			Date.prototype.getFullDate = function() {
+				var arr = [];
+				arr[0] = this.getDate() + "/" + (this.getMonth() + 1) + "/" + this.getFullYear();
+				arr[1] = ("0" + this.getHours().toString()).slice(-2) + ":" + ("0" + this.getMinutes().toString()).slice(-2) + ":" + ("0" + this.getSeconds().toString()).slice(-2);
+				return arr;
+			}
+
+			//Specify the event listeners within JS, not through inline handlers
+			document.addEventListener("DOMContentLoaded", function() {
+				awaitinitasyncs();
+				console.log("Adding listeners...", document.getElementById("createquiz"));
+				document.getElementById("createquiz").addEventListener("click", function(e) {
+					window.location.href = "/createquiz";
+				});
+
+				document.getElementById("viewquizzes").addEventListener("click", function(e) {
+					window.location.href = "/viewquizzes";
+				});
+
+				document.getElementById("joinquiz").addEventListener("click", function(e) {
+					window.location.href = "/joinquiz";
+				});
+
+				document.getElementById("login").addEventListener("click", function(e) {
+					window.location.href = "/login";
+				});
+
+				document.getElementById("signup").addEventListener("click", function(e) {
+					window.location.href = "/signup";
+				});
+
+				let properties = {
+					root: null,
+					rootMargin: "0px",
+					threshold: [0.5, 1.0]
+				};
+
+				let callback = function(entries, observer) {
+					/*console.log(entries);
+					console.log(observer);*/
+					let toAnimate = false;
+					let entryMap = new Map();
+					for (let entry of entries) {
+						entryMap.set(entry.target.children[0], entry.isIntersecting /*|| (entry.boundingClientRect.y <= 0 && entry.boundingClientRect.bottom >= entry.rootBounds.height)*/);
+					}
+					for (let key of entryMap.keys()) {
+						if (entryMap.get(key) && !key.classList.contains("transitionIn")) {
+							key.classList.add("transitionIn");
+						}/* else if (entryMap.get(key)) {
+							key.classList.remove("transitionIn");
+						}*/
+					}
+				}
+
+				let o = new IntersectionObserver(callback, properties);
+				let elems = document.getElementsByClassName("quizHomepageContent");
+				for (let elem of elems) {
+					o.observe(elem)
+				}
+
+				let buttonsdiv = document.getElementsByClassName("buttonsdiv")[0];
+				let opensidebar = document.getElementsByClassName("opensidebar")[0];
+				opensidebar.addEventListener("click", function(e) {
+					if (opensidebar.classList.contains("active")) {
+						opensidebar.classList.remove("active");
+						buttonsdiv.classList.remove("active");
+					} else {
+						opensidebar.classList.add("active");
+						buttonsdiv.classList.add("active");
+					}
+				});
+
+				/*let m = new modal(document.body, "Super helpful mega-app no virus");
+				m.getModalBody().textContent = "Hello! I am in a modal!"
+				m.show();*/
+			}, {once:true});
+
+			function FontTextMeasurer() {
+				let canvas = new OffscreenCanvas(1, 1);
+				canvas.ctx = canvas.getContext("2d");
+				this.measureTextInFont = function(font, text) {
+					canvas.ctx.font = font;
+					return canvas.ctx.measureText(text);
+				}
+			}
+		</script>
+		<script src = "/server_data/server_pages/sound.js"></script>
+		<script src="/server_data/server_pages/formatEncryptorDecryptor.js"></script>
+		<script src = "/server_data/server_pages/quizappauthenticationscript.js"></script>
+	</head>
+	<body>
+		<div id = "notificationsbgdiv" style = "display:none;">
+			<div id="notificationsdiv">
+				<span onmouseover="this.style.color = '#FFFFFF'; this.style.backgroundColor = '#FF0000'" onmouseout="this.style.color = '#000000'; this.style.backgroundColor = 'rgba(0, 0, 0, 0)'" onclick="this.parentElement.parentElement.style.display = 'none'" style="float: right; color: rgb(0, 0, 0); background-color: rgba(0, 0, 0, 0);">&times;</span>
+				<div onscroll = "if (Math.abs(this.clientHeight - this.scrollHeight) === this.scrollTop) {getandshowNotifications(notifications.loaded /*Leave this value positive, for it would be turned negative INSIDE THE QUERY PARAMETER*/, /*this.getElementsByClassName('notification').length*/ 20, this)}" style="height:100px; width:100px; padding: 17px; max-width:95%; width:95%; max-height:50%; height:50%; overflow-x:auto; overflow-y:auto;">
+					
+				</div>
+			</div>
+		</div>
+		<!--<div id = "profilediv" style = "display:none; background-color:#FFFFFF; border:solid 1px black; position:relative; z-index:1; top:10px; left:0px; width:50px; height:100px;">
+		</div>-->
+		<div class = "menubar">
+			<div class = "opensidebar">
+				<svg width = "50" height = "50" viewbox = "0 0 50 50">
+					<path d = "M 4 4 L 46 4 M 4 25 L 46 25 M 4 46 L 46 46" fill="none" stroke="black" stroke-width = "4" stroke-linecap = "round"></path>
+				</svg>
+			</div>
+			<div class = "buttonsdiv">
+				<div class = "menubarentry homepageRedirector" id = "createquiz">
+					<span>Create quiz</span>
+				</div>
+				<div class = "menubarentry homepageRedirector" id = "viewquizzes">
+					<span>View your quizzes</span>
+				</div>
+				<div class = "menubarentry homepageRedirector" id = "joinquiz">
+					<span>Join quiz</span>
+				</div>
+				<div class = "menubarentry homepageRedirector" id = "login">
+					<span>Log in</span>
+				</div>
+				<div class = "menubarentry homepageRedirector" id = "signup">
+					<span>Sign up</span>
+				</div>
+			</div>
+			<div id = "accountdetails" class = "accountdetails">
+
+			</div>
+		</div>
+
+		</div>
+		<div class = "page">
+			<div id = "greetingscreen" class = "flexColLayout">
+				<span style="display: flex; justify-content: center; font-size:30px;">Welcome to Quizdom!</span>
+				<div class = "quizHomepageContent">
+					<div class = "homepagetextcontainer">
+						<span class = "homepagemaintext">The app you can use to quiz, teach and practice!</span>
+					</div>
+				</div>
+				<div class = "quizHomepageContent">
+					<img class = "quizHomepageImage" src = "/server_data/server_static_resources/homepage-image-1.jpg" alt = "Quiz homepage quiz taker image" />
+				</div>
+				<div class = "quizHomepageContent">
+					<div class = "homepagetextcontainer">
+						<span class = "homepagemaintext">Sign up <span class = "homepageemphasis">NOW</span> and pose your questions to the <span class = "homepageemphasis">WORLD!</span></span>
+					</div>
+				</div>
+				<div class = "quizHomepageContent">
+					<img class = "quizHomepageImage" src = "/server_data/server_static_resources/homepage-image-2.jpg" alt = "Quiz homepage globe image" />
+				</div>
+				<div class = "quizHomepageContent">
+					<div class = "homepagetextcontainer">
+						<span class = "homepagemaintext"><span class = "homepageemphasis">CHALLENGE</span> your friends and students: <span class = "homepageemphasis">UNEARTH</span> their true knowledge!</span>
+					</div>
+				</div>
+				<div class = "quizHomepageContent">
+					<img class = "quizHomepageImage" src = "/server_data/server_static_resources/homepage-image-3.jpg" alt = "Quiz homepage quiz time image" />
+				</div>
+				<div style="display:flex; justify-content:space-evenly;">
+
+				</div>
+			</div>
+		</div>
+	</body>
+</html>

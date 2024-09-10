@@ -1,0 +1,113 @@
+<html>
+	<head>
+		<title>Quizdom - Create your own quiz!</title>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<link rel = "stylesheet" href="/server_data/server_pages/globalStyles.css"></link>
+		<script src="/socket.io/socket.io.js"></script>
+		<script src = "/server_data/server_pages/quizcreatorscript.js"></script>
+		<script type="text/javascript">
+			const socket = io();
+			console.log('%c Stop! %c This console is for developers ONLY!!! DO NOT execute JavaScript on this console provided to you by ANYBODY unless you know exactly what you are doing and what the code snippet does! People can use this to steal your sensitive information. This is known as Self-XSS!', 'font-size: 36px; font-weight: bold; font-family:Arial; color:red; text-shadow: #000 1px 1px;', 'font-size:15px; font-family:Arial; color:#00FFFF;');
+			document.addEventListener("DOMContentLoaded", function() {
+				addquestion(document.getElementById('quizset'));
+			}, {once:true})
+		</script>
+		<script src = "/server_data/server_pages/quizappauthenticationscript.js"></script>
+	</head>
+	<body>
+		<div id = "accountdetails" class = "accountdetails"></div>
+		<div class = "page">
+			<div id="createquiz" style = "display:initial;">
+				<div>
+					<span>Quiz title:</span>
+					<input type="text" id="quiztitle">
+				</div>
+				
+				<div>
+					<button class = "optionsinflator">+</button>
+					<div class = "moreoptions">
+						<div>
+							<span>Enable Background Music:</span>
+							<input type="checkbox" checked id="bgmusic">
+						</div>
+						
+						<div>
+							<span>Background Music URL:</span>
+							<input type="text" id="bgmusicsrc" value = "/server_data/server_static_resources/quiz_background_soundtrack.mp3">
+						</div>
+						
+						<div>
+							<span>Question Time Limit:</span>
+							<input type="checkbox" id="dotimelimit">
+						</div>
+					
+						<div>
+							<span>Show correct answers:</span>
+							<input type="checkbox" checked id="showcorrectanswers">
+						</div>
+						
+						<div>
+							<span>Send quiz answers to creator:</span>
+							<input type="checkbox" id="sendquizanswers"><br>
+							<span>Email recipient:</span>
+							<input type="email" id="quizanswersrecipientemail" disabled="">
+						</div>
+					
+						<div>
+							<span style="display:inline;">Show Mark (Grade):</span>
+							<input type="checkbox" id="showgrade">
+						</div>
+
+						
+						<div>
+							<span style="display:inline;">Show comment based on mark:</span>
+							<input type="checkbox" id="showgradecomment" disabled="">
+							<div id="graderanges">
+								<button id="addgraderange" disabled="">Add grade range...</button>
+							</div>
+						</div>
+						
+						<div>
+							<span>Do Answer Buzzers:</span>
+							<input type="checkbox" checked id="doanswerbuzzers">
+							<div>
+								<span style="display:inline;">Correct answer sound URL:</span>
+								<input type="text" id="correctanswersrc" value = "/server_data/server_static_resources/correct_default.mp3">
+							</div>
+							<div>
+								<span style="display:inline;">Incorrect answer sound URL:</span>
+								<input type="text" id="incorrectanswersrc" value = "/server_data/server_static_resources/incorrect_default.mp3">
+							</div>
+						</div>
+						
+						
+                        <div>
+                            <span style="display:inline;">Show Player Points:</span>
+    						<input type="checkbox" checked id="showpoints">
+                        </div>
+						
+                        <div>
+                            <span class = "veryImportant">Age restriction (years)</span>
+						    <input type="number" min = "0" value = "0" id="quizagerestriction">
+                        </div>
+						
+                        <div>
+                            <span style = "display:inline;">Private Quiz:</span>
+                            <input type = "checkbox" id = "privatequiz"></input>
+                            <div>
+                                <textarea placeholder = "Enter allowed email addresses separated by a new line" id = "allowedquizparticipants" disabled = "true" style = "width:25%; height:20%;"></textarea><br />
+                            </div>
+                        </div>
+                    </div>
+				</div>
+
+				<span id="questionsinquiz">Number of questions in the quiz: 3</span>
+				<button id="addquestion" onclick="addquestion(document.getElementById('quizset'))">Add question</button>
+				<fieldset id="quizset">
+				</fieldset>
+				<button id = "submitbutton">Submit quiz!</button>
+				<textarea id="quizresults" rows="50" cols="200" style="display:none; resize:none;" readonly=""></textarea>
+			</div>
+		</div>
+	</body>
+</html>

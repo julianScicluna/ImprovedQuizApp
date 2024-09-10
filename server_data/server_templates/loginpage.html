@@ -1,0 +1,75 @@
+<html>
+	<head>
+		<title>Log in to Quizdom!</title>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<script src="/socket.io/socket.io.js"></script>
+		<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-gH2yIJqKdNHPEq0n4Mqa/HGKIhSkIHeL5AyhkYV8i59U5AR6csBvApHHNl/vI1Bx" crossorigin="anonymous">
+		<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-A3rJD856KowSb7dwlZdYEkO39Gagi7vIsF0jrRAoQmDKKtQBHUuLZ9AsSv4jD4Xa" crossorigin="anonymous"></script>
+		<script language = "javascript">
+			console.log('%c Stop! %c This console is for developers ONLY!!! DO NOT execute JavaScript on this console provided to you by ANYBODY unless you know exactly what you are doing and what the code snippet does! People can use this to steal your sensitive information. This is known as Self-XSS!', 'font-size: 36px; font-weight: bold; font-family:Arial; color:red; text-shadow: #000 1px 1px;', 'font-size:15px; font-family:Arial; color:#00FFFF;');
+			const socket = io();
+    			async function login(email, pwd, socketid) {
+        			var xhr = new XMLHttpRequest();
+        			xhr.open("POST", location.origin + "/login");
+        			xhr.setRequestHeader("Content-Type", "application/json");
+        			xhr.responseType = "text";
+        			xhr.send(JSON.stringify({email:email, password:pwd, socketid:socketid}))
+        			await new Promise(function(res, rej) {
+						xhr.onload = function() {
+							if (xhr.status === 200) {
+								res();
+							} else {
+								rej();
+							}
+						}
+						xhr.onerror = rej;
+					}).catch(function() {
+						alert(xhr.response);
+						throw "LoginError: " + xhr.response;
+					});
+					window.location.href = location.origin;
+    			}
+		</script>
+	</head>
+	<body>
+        	<div class="container-fluid p-5" style="background-image:url('https://img.freepik.com/premium-vector/quiz-seamless-pattern-doodle-style-vector-illustration-back-school-background_501826-310.jpg?w=500'); background-repeat: repeat;">
+	           	<div class="mt-5"></div>
+        	    	<div class="row align-items-center">
+               			<div class="col"></div>
+                		<div class="col align-self-center">
+                    			<div class="card">
+                        			<div class="card-body">
+                            				<div class="d-flex justify-content-center">
+                                				<img width="200" height="200" src="/server_data/server_media/tnqlogo.png" alt = "Quiz image" class="m-auto" />
+                            				</div>
+                            				<div class="mb-3">
+                                				<label for="login-email-input" class="form-label">Enter your email</label>
+                               					<input type="email" class="form-control" id="email" placeholder="Your email here:">
+                            				</div>
+                            				<div class="mb-3">
+                                				<label for="login-password-input" class="form-label">Enter your password</label>
+                                				<div class="input-group mb-3">
+                                    					<input type="password" class="form-control" id="password"/>
+                               						<!-- TODO @jScicluna This is the hide password icon use js to toggle between hide/view -->
+	                               					<button class="btn btn-outline-secondary" type="button" id="eye-password" onclick = "var pwdelem = document.getElementById('password'); if (pwdelem.type === 'password') {pwdelem.type = 'text'; this.children[1].style.display = 'inline-block'; this.children[0].style.display = 'none';} else {pwdelem.type = 'password'; this.children[1].style.display = 'none'; this.children[0].style.display = 'inline-block';}">
+										<svg style = "display:inline;" xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
+										<svg style = "display:none;" xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            						<path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                               	            						<path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                       	  					</svg>
+									</button>
+                               					</div>
+	                            			</div>
+        	                    			<div class="text-center">
+                	                			<a href="#" class="btn btn-primary" onclick = "login(document.getElementById('email').value, document.getElementById('password').value, socket.id)" style="color:#00FF00; background-color:#0000FF; font-family:Consolas; font-size:30px;">Log in!</a>
+                        	    			</div>
+                        			</div>
+                    			</div>
+	               		</div>
+        	       		<div class="col"></div>
+			</div>
+			<span style="font-size:10px;">Don't have an account?&nbsp;<a href="/signup">Sign up for free!</a></span>
+			<div style="display: flex; justify-content: center; position: fixed; bottom: 25px; width: 100%;"><button onclick="window.location.href = window.location.origin + '/'">Home</button><button onclick="window.location.href = window.location.origin + '/login'">Log in</button><button onclick="window.location.href = window.location.origin + '/signup'">Sign up</button></div>
+		</div>
+	</body>
+</html>

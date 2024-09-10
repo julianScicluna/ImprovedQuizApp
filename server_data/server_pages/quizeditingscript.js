@@ -177,8 +177,20 @@ let quizFillOnDOMLoad = function(quizData) {
 	}
 }
 
-//This should be a global variable
-listenerNamespace.nextDOMLoadFuncs.push(async function() {
-	//TODO: FIX THIS NIGHTMARE!
-	quizFillOnDOMLoad(await getQuizData());
+//Wait for both the socket to connect and the document to load
+Promise.all([
+	new Promise(function(res, rej) {
+		document.addEventListener("DOMContentLoaded", res, {once: true});
+	}),
+	new Promise(function(res, rej) {
+		//Only listen for connection event once; it can be fired multiple times whilst on the same page through repeated disconnects and reconnects
+		socket.once("connect", res);
+	})
+]).then(async function(data) {
+	let quizData = await getQuizData();
+	console.log(quizData)
+	quizFillOnDOMLoad(quizData);
 });
+/*listenerNamespace.nextDOMLoadFuncs.push(async function() {
+	//TODO: FIX THIS NIGHTMARE!
+});*/

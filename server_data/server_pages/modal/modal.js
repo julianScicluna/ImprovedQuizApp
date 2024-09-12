@@ -133,10 +133,14 @@ class modal extends EventTarget {
 
 		modaltopdiv.addEventListener("pointerdown", (function(e) {
 			if (e.target !== modalclosebtn && !this.#topclicked && !this.#windowStats.fullScreen) {
+				//Prevent scrolling instead of window dragging for phones
+				//TODO: Also destroy the touch-action property whenever the pointer leaves the document
+				modaldiv.classList.add("nopanonphone");
 				this.#topclicked = true;
 				//Prevent element selection whilst dragging
 				document.documentElement.classList.add("noselect");
-				this.#initclickpos = [e.offsetX, e.offsetY];
+				//DUE TO BORDER. Add 1 because the element's width/height start at the border. This does not apply to the event offsetX/offsetY properties.
+				this.#initclickpos = [e.offsetX + 1, e.offsetY + 1];
 				this.#movingdiv = document.createElement("div");
 				this.#movingdiv.classList.add("movingdiv");
 
@@ -156,10 +160,11 @@ class modal extends EventTarget {
 				}).bind(this);
 				let pointerCoords = {x:e.clientX, y:e.clientY};
 				let invokeFunction = true;
+				//TODO: Fix the egregious performance implications posed by the constant reflows while scrolling triggered by constant invocation of the getter functions in window.scrollX and window.scrollY 
 				let scrollHandler = function() {
 					//Throttling, to reduce the number of invocations to this function and therefore reflows
 					if (invokeFunction) {
-						//invokeFunction = false;
+						invokeFunction = false;
 						requestAnimationFrame(function() {
 							repositionHandler({
 								pageX: window.scrollX + pointerCoords.x,
@@ -190,6 +195,7 @@ class modal extends EventTarget {
 				this.#movingdiv.addEventListener("pointermove", repositionHandler);
 				window.addEventListener("scroll", scrollHandler, {passive:true});
 				let removeBackScreen = (function() {
+					modaldiv.classList.remove("nopanonphone")
 					//Set its real position here, when it is to be removed from its fixed-position parent
 					modaldiv.style.translate = this.#windowStats.left + "px " + this.#windowStats.top + "px";
 					//Remove event listeners since we are ready with them; we no longer need them wasting CPU clock cycles
@@ -244,16 +250,27 @@ class modal extends EventTarget {
 		var stopperHandler = function(e) {
 			e.stopPropagation();
 		}
-		modalfsbtn.onpointerdown = stopperHandler;
-		modalfsbtn.onpointerup = stopperHandler;
+		modalfsbtn.addEventListener("pointerdown", stopperHandler);
+		modalfsbtn.addEventListener("pointerup", stopperHandler);
 		modalfsbtn.onclick = this.#windowManagement.enterFullScreen;
 		modalfsbtn.innerHTML = "&#x26F6;";
 		modaltopdiv.appendChild(modalfsbtn);
 
 		var modalbodydiv = document.createElement("div");
 		modalbodydiv.classList.add("modalbody");
-		modaldiv.onpointerdown = (function(e) {
-			if (resizable && e.target == modaldiv) {
+		modaldiv.addEventListener("pointerdown", (function(e) {
+			//Only do this if the user clicked on the modal div itself
+			if (resizable && e.target === modaldiv) {
+				let initialWindowPos = {
+					x: this.#windowStats.left - window.scrollX,
+					y: this.#windowStats.top - window.scrollY,
+				}
+				//TODO: Verify the accuracy of the below lines of code
+				//This is due to the transition from absolute positioning to fixed positioning, which causes problems with scrolling
+				//Also note that translate is relative to the TOP-LEFT corner of the HTMLElement (unless otherwise specified by the transformation origin)
+console.log(e.clientX, e.clientY, this.#windowStats)
+				//Do not forget to deduct 1 from both the X and Y values due to the border
+				modaldiv.style.translate = `${e.clientX - e.offsetX - 1}px ${e.clientY - e.offsetY - 1}px`;
 				this.#sideclicked = true;
 				document.documentElement.classList.add("noselect");
 				this.#initclickpos = [
@@ -262,20 +279,35 @@ class modal extends EventTarget {
 				];
 				this.#movingdiv = document.createElement("div");
 				this.#movingdiv.classList.add("movingdiv");
-				this.#movingdiv.onpointermove = (function(event) {
+				//Handle scroll events and update the window's position accordingly
+				//TODO: Mitigate the reflows caused by querying scroll values, perhaps by caching them
+				let windowScrollHandler = (function() {
+					//Decrement by 1; do not forget the border
+					this.#windowStats.left = (e.clientX - e.offsetX - 1) + window.scrollX;
+					this.#windowStats.top = (e.clientY - e.offsetY - 1) + window.scrollY;
+				}).bind(this);
+				window.addEventListener("scroll", windowScrollHandler);
+				let movingDivPointerMoveHandler = (function(event) {
 					//Only allow window resizing if the window is not in fullscreen mode
 					if (!this.#windowStats.fullScreen) {
 						if (e.offsetX >= this.#initclickpos[0] - 5) {
-							this.#windowStats.width = Math.max(50, (event.pageX - this.#windowStats.left))
+							this.#windowStats.width = Math.max(50, (event.clientX - initialWindowPos.x));
 							modaldiv.style.width = this.#windowStats.width + "px";
 						}
 						if (e.offsetY >= this.#initclickpos[1] - 5) {
-							this.#windowStats.height = Math.max(20, (event.pageY - this.#windowStats.top))
+							this.#windowStats.height = Math.max(20, (event.clientY - initialWindowPos.y));
 							modaldiv.style.height = this.#windowStats.height + "px";
 						}
 					}
 				}).bind(this);
-				this.#movingdiv.onpointerup = (function() {
+				this.#movingdiv.addEventListener("pointermove", movingDivPointerMoveHandler);
+				//TODO: On pointer up, remove this event listener and that for pointermove
+				this.#movingdiv.onpointerup = (function(event) {
+					//VERY IMPORTANT: remove the scroll listener to prevent listener leaks which would deteriorate performance significantly due to the heavy operations each one performs (triggering reflows/layout thrashing)
+					window.removeEventListener("scroll", windowScrollHandler);
+
+					//Window resizing complete; revert to absolute positioning. 'Private' variable #windowStats's top and left members are always absolute (i.e.: relative to the page, not the viewport)
+					modaldiv.style.translate = `${this.#windowStats.left}px ${this.#windowStats.top}px`;
 					this.#sideclicked = false;
 					document.documentElement.classList.remove("noselect");
 					parentElem.appendChild(modaldiv);
@@ -285,11 +317,11 @@ class modal extends EventTarget {
 				this.#movingdiv.appendChild(modaldiv);
 				document.body.appendChild(this.#movingdiv);
 			}
-		}).bind(this);
-		modalbodydiv.onpointerup = (function() {
+		}).bind(this));
+		modalbodydiv.addEventListener("pointerup", (function() {
 			this.#sideclicked = false;
 			document.documentElement.classList.remove("noselect");
-		}).bind(this);
+		}).bind(this));
 		modaldiv.appendChild(modalbodydiv);
 
 		var modaltitle = document.createElement("span");

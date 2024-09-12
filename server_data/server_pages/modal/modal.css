@@ -1,96 +1,100 @@
 div.modaldiv {
-    top: 0px;
-    left: 0px;
-    position: absolute;
-    background-color: rgba(50, 50, 50, 0.15);
-    border: solid 1px black;
-    border-radius: 5px;
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-start;
-    align-items: stretch;
+	top: 0px;
+	left: 0px;
+	position: absolute;
+	background-color: rgba(50, 50, 50, 0.15);
+	border: solid 1px black;
+	border-radius: 5px;
+	display: flex;
+	flex-direction: column;
+	justify-content: flex-start;
+	align-items: stretch;
 }
 
 div.modaldiv > div.modaltopdiv {
-    top: 0px;
-    left: 0px;
-    width: 100%;
-    height: 20px;
-    min-width: 50px;
-    position: relative;
-    background-color: rgba(0, 0, 0, 0);
-    flex-grow: 0;
-    flex-shrink: 0;
+	top: 0px;
+	left: 0px;
+	width: 100%;
+	height: 20px;
+	min-width: 50px;
+	position: relative;
+	background-color: rgba(0, 0, 0, 0);
+	flex-grow: 0;
+	flex-shrink: 0;
 }
 
 div.modaltopdiv > .modalclosebtn {
-    width: 15px;
-    float: right;
-    display: flex;
-    font-size: 15px;
-    user-select:none;
-    border-radius: 5px;
-    justify-content: center;
-    color: rgba(0, 0, 0, 255);
-    border: solid 1px black;
-    background-color: rgba(0, 0, 0, 0);
+	width: 15px;
+	float: right;
+	display: flex;
+	font-size: 15px;
+	user-select:none;
+	border-radius: 5px;
+	justify-content: center;
+	color: rgba(0, 0, 0, 255);
+	border: solid 1px black;
+	background-color: rgba(0, 0, 0, 0);
 }
 
 div.modaltopdiv > .modalfsbtn {
-    color: rgba(0, 0, 0, 255);
-    background-color: rgba(0, 0, 0, 0);
-    float: right;
-    font-size: 15px;
-    width: 15px;
-    display: flex;
-    justify-content: center;
-    border: solid 1px black;
-    border-radius: 5px;
-    user-select:none;
+	color: rgba(0, 0, 0, 255);
+	background-color: rgba(0, 0, 0, 0);
+	float: right;
+	font-size: 15px;
+	width: 15px;
+	display: flex;
+	justify-content: center;
+	border: solid 1px black;
+	border-radius: 5px;
+	user-select:none;
 }
 
 div.modaldiv > div.modalbody {
-    margin:5px;
-    margin-top:0px;
-    background-color: #FFFFFF;
-    overflow: auto;
-    min-width: 30px;
-    border-radius: 5px;
-    flex-grow: 1;
-    flex-shrink: 1;
+	margin:5px;
+	margin-top:0px;
+	background-color: #FFFFFF;
+	overflow: auto;
+	min-width: 30px;
+	border-radius: 5px;
+	flex-grow: 1;
+	flex-shrink: 1;
 }
 
 div.movingdiv {
-    top: 0px;
-    left: 0px;
-    width: 100%;
-    height: 100%;
-    position: fixed;
-    background-color: rgba(0, 0, 0, 0);
-    z-index:10;
+	top: 0px;
+	left: 0px;
+	width: 100%;
+	height: 100%;
+	position: fixed;
+	background-color: rgba(0, 0, 0, 0);
+	z-index:10;
 }
 
 div.modaldiv.fullscreen {
-    position: fixed;
-    z-index:10;
-    border-radius: 0px;
+	position: fixed;
+	z-index:10;
+	border-radius: 0px;
 }
 
 
 div.modaldiv.fullscreen > div.modalbody {
-    margin:0px;
-    border-radius: 0px;
+	margin:0px;
+	border-radius: 0px;
 }
 
 span.modaltitle {
-    float: left;
-    text-overflow: ellipsis;
-    user-select: none;
-    max-width: 50%;
-    white-space: nowrap;
-    overflow: hidden;
+	float: left;
+	text-overflow: ellipsis;
+	user-select: none;
+	max-width: 50%;
+	white-space: nowrap;
+	overflow: hidden;
 }
 
 .noselect {
-    user-select: none;
+	user-select: none;
+}
+
+.nopanonphone {
+	touch-action: none;
 }

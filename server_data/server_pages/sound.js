@@ -1,8 +1,8 @@
 class Sound {
     #active;
-    #playCompletionPromiseRej;
+    #playerStopHandlers;
     constructor(URL) {
-        this.#playCompletionPromiseRej = null;
+        this.#playerStopHandlers = [];
         this.#active = true;
         this.player = new Audio();
         this.player.src = URL;
@@ -28,19 +28,26 @@ class Sound {
         this.player.currentTime = 0;
         if (typeof playCompletionPromiseRej === "function") {
             //Reject any completion promises
-            playCompletionPromiseRej();
-            playCompletionPromiseRej = null;
+            while (this.#playerStopHandlers.length > 0) {
+                if (typeof this.#playerStopHandlers[0] === "function") {
+                    this.#playerStopHandlers[0]();
+                    this.#playerStopHandlers.shift();
+                }
+            }
         }
     }
     playAndAwaitCompletion() {
-        if (typeof playCompletionPromiseRej === "null") {
-            return this.play().then(function() {
-                return new Promise(function(res, rej) {
-                    playCompletionPromiseRej = rej;
-                    this.player.onended = res;
-                });
-            });
-        }
+        return this.play().then((function() {
+            return new Promise((function(res, rej) {
+                this.#playerStopHandlers.push(rej);
+                let playerEndHandler = (function() {
+                    this.player.removeEventListener("ended", playerEndHandler);
+                    this.#playerStopHandlers.splice(this.#playerStopHandlers.indexOf(rej), 1);
+                    res();
+                }).bind(this);
+                this.player.addEventListener("ended", playerEndHandler);
+            }).bind(this));
+        }).bind(this));
     }
     async playAndDestroy() {
         this.player.autoplay = true;

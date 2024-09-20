@@ -55,11 +55,13 @@ async function peekAtQuiz(quizCode) {
 		return;
 	}
 
+	console.log(peekObj);
+
 	//Make all the DOM changes before appending the branch to the visible DOM, in order to reduce the number of reflows
 	peekAtQuizTemplate.getElementsByClassName("quizname")[0].textContent = `"${peekObj.quizData.quizTitle}"`;
 	peekAtQuizTemplate.getElementsByClassName("numquizquestions")[0].textContent = peekObj.quizData.numQuestions;
 	peekAtQuizTemplate.getElementsByClassName("quizcreatorusername")[0].textContent = `"${peekObj.creatorData.userName}"`;
-	peekAtQuizTemplate.getElementsByClassName("quizcreatorprofilepic")[0].src = "/server_data/" + peekObj.creatorData.profilePic; //TODO: Complete URI
+	peekAtQuizTemplate.getElementsByClassName("quizcreatorprofilepic")[0].src = peekObj.creatorData.profilePic; //TODO: Complete URI
 	peekAtQuizTemplate.getElementsByClassName("quizcreatoremail")[0].textContent = peekObj.creatorData.emailAddress;
 	//peekAtQuizTemplate.getElementsByClassName("visitprofilepage")[0].href = ""; //TODO: Implement page functionality
 
@@ -170,7 +172,24 @@ Will a comment based on your grade be shown? ${peekObj.quizData.showGradeComment
 	document.body.remove();
 	document.documentElement.appendChild(newBody);
 
+
 }
+
+const whiteSpaceRemover = {
+	whiteSpaceChars: ["\n", "\t", " ", "\r", "\f", "\v", "\u00A0", "\u2002", "\u2003", "\u2009", "\u200B", "\u200C", "\u200D", "\u3000"],
+	removeLeadingTrailingWhiteSpace(str) {
+		let startIndex = 0;
+		let endIndex = str.length;
+		while (this.whiteSpaceChars.indexOf(str[startIndex]) !== -1) {
+			startIndex++;
+		}
+		while (this.whiteSpaceChars.indexOf(str[endIndex - 1]) !== -1) {
+			endIndex--;
+		}
+		return str.slice(startIndex, endIndex);
+	}
+}
+Object.freeze(whiteSpaceRemover);
 
 async function joinquiz(quizCode) {
 	//Create an inner scope (closure) which cannot be accessed externally except through the function returned by the IIFE (Immediately-Invoked-Function-Expression), which serves as a getter method, rendering the now finalised quiz code read-only
@@ -221,6 +240,11 @@ async function joinquiz(quizCode) {
 	//Insert new document
 	document.append(newMainDocumentElement);
 
+	//Not needed due to automatic style loader
+	/*if (typeof modal === "function") {
+		//Reload the stylesheets due to them being lost with page redirection
+		loadModalStyleSheets();
+	}*/
 	try {
 		await performQuiz(quizMetadata);
 	} catch (e) {
@@ -524,14 +548,15 @@ async function performQuiz(quizMetadata) {
 		//Play this nackground music in a loop
 		await backgroundMusic.play(true);
 	}
+	bg = backgroundMusic;
 	let i;
-	for (i = 0; i < quizMetadata.numQuestions; i++) {
+	for (i = quizMetadata.currentQuestionIndex; i < quizMetadata.numQuestions; i++) {
 		//This is to signify timers to stop and is declared within the scope of every for loop to ensure that each iterator gets its own state
 		let answerHasBeenDelivered = false;
 		questionsRatio.textContent = `Question ${i + 1} of ${quizMetadata.numQuestions}`;
 		latestPromise = createSocketResponsePromise("question");
 		//Done for readability (safe alternative would have been dragging a whole iteration outside the loop)
-		if (i === 0) {
+		if (i === quizMetadata.currentQuestionIndex) {
 			socket.emit("countdownReady");
 		} else {
 			socket.emit("readyQuestion");
@@ -675,7 +700,7 @@ async function performQuiz(quizMetadata) {
 					//Equivalent to pressing submit button
 					e.stopPropagation();
 					e.preventDefault();
-					deliverAnswer(textField.value);
+					deliverAnswer(whiteSpaceRemover.removeLeadingTrailingWhiteSpace(textField.value));
 				}
 			});
 			responseContentDiv.appendChild(textField);
@@ -686,7 +711,7 @@ async function performQuiz(quizMetadata) {
 			submit.classList.add("submitButton");
 			//Deliver the answer on submit button click
 			submit.addEventListener("click", function() {
-				deliverAnswer(textField.value);
+				deliverAnswer(whiteSpaceRemover.removeLeadingTrailingWhiteSpace(textField.value));
 			});
 			let submitChild = document.createElement("div");
 			submitChild.textContent = "Submit your answer!";
@@ -712,7 +737,7 @@ async function performQuiz(quizMetadata) {
 				timerElem.value = 0;
 				if (question.questionType === "textchoice") {
 					//Deliver the text within the textbox
-					deliverAnswer(textField.value);
+					deliverAnswer(whiteSpaceRemover.removeLeadingTrailingWhiteSpace(textField.value));
 				} else {
 					deliverAnswer("");
 				}
@@ -768,6 +793,7 @@ async function performQuiz(quizMetadata) {
 				correctOptionsDiv = document.createElement("div");
 				//div element to store the correct answers
 				let correctOptionsDivLabel = document.createElement("div");
+				correctOptionsDiv.classList.add("smallContent");
 				correctOptionsDiv.appendChild(correctOptionsDivLabel);
 				if (response.correctAnswers.length === 1) {
 					correctOptionsDiv.textContent = "Correct option:";
@@ -859,7 +885,7 @@ async function performQuiz(quizMetadata) {
 			answerPointsDiv.appendChild(pointsDisplayDiv)
 
 			pointsSpan = document.createElement("span");
-			pointsSpan.classList.add("content");
+			pointsSpan.classList.add("contentContainer");
 			pointsSpan.textContent = "Points: " + (response.points - response.pointsGained);
 			pointsDisplayDiv.appendChild(pointsSpan);
 			if (response.correct) {
@@ -1058,7 +1084,7 @@ async function performQuiz(quizMetadata) {
 			let gradeSpan = document.createElement("span");
 			gradeSpan.classList.add("smallDarkContent");
 			gradeSpan.classList.add("dark");
-			gradeSpan.textContent = `You got ${response.grade}/${quizMetadata.numQuestions} (${response.grade/quizMetadata.numQuestions}%)`;
+			gradeSpan.textContent = `You got ${response.grade}/${quizMetadata.numQuestions} (${response.grade/quizMetadata.numQuestions * 100}%)`;
 			resultsDiv.appendChild(gradeSpan);
 
 			//Display the grade comment, if applicable
@@ -1094,6 +1120,66 @@ async function performQuiz(quizMetadata) {
 			//Allow people to view a detailed report containing their results
 			let button = document.createElement("button");
 			button.textContent = "View a detailed answer report...";
+			//If the user wished to share these, they would be null
+			button.setAttribute("detailsid", response.questionAnswersID);
+			button.addEventListener("click", async function(e) {
+				//Do this immediately due to the wait caused by the asynchronous request (await fetch...)
+				e.stopPropagation();
+				let res = await fetch(`/fetchDetailedResponse?responseID=${e.currentTarget.getAttribute("detailsid")}`, {
+					method: "GET"
+				});
+				if (res.status !== 200) {
+					//Display error
+					alert(await res.text());
+					return;
+				}
+				//Response OK. Attempt to parse it as an HTML document
+				let detailedResponseDOM = htmlparser.parseFromString(await res.text(), "text/html");
+				//Check if the library is available for use
+				if (typeof modal === "function") {
+					let m = new modal(document.body, "Your detailed quiz answers");
+					m.setModalWidth(window.innerWidth/2);
+					m.setModalHeight(window.innerHeight/2);
+					m.setModalLeft(window.innerWidth/4);
+					m.setModalTop(window.innerHeight/4);
+					m.getModalBody().append(...detailedResponseDOM.body.childNodes);
+					m.show();
+				} else {
+					let fallbackModalBgDiv = document.createElement("div");
+					fallbackModalBgDiv.classList.add("fallbackModalBg");
+					fallbackModalBgDiv.addEventListener("click", function(e) {
+						if (e.target === fallbackModalBgDiv) {
+							fallbackModalBgDiv.remove();
+						}
+					})
+
+					let fallbackModalDiv = document.createElement("div");
+					fallbackModalDiv.classList.add("fallbackModal");
+					fallbackModalBgDiv.appendChild(fallbackModalDiv);
+
+					let fallbackModalHeadDiv = document.createElement("div");
+					fallbackModalHeadDiv.classList.add("fallbackModalHead");
+					fallbackModalDiv.appendChild(fallbackModalHeadDiv);
+
+					let fallbackModalCloseBtn = document.createElement("span");
+					fallbackModalCloseBtn.classList.add("closebutton");
+					fallbackModalCloseBtn.role = "button";
+					fallbackModalCloseBtn.innerHTML = "&times;";
+					fallbackModalCloseBtn.addEventListener("click", function() {
+						fallbackModalBgDiv.remove();
+					});
+					fallbackModalHeadDiv.appendChild(fallbackModalCloseBtn);
+
+					let fallbackModalBodyDiv = document.createElement("div");
+					fallbackModalBodyDiv.classList.add("fallbackModalHead");
+					fallbackModalDiv.appendChild(fallbackModalBodyDiv);
+
+
+					fallbackModalBodyDiv.append(...detailedResponseDOM.body.childNodes);
+
+					document.body.appendChild(fallbackModalBgDiv);
+				}
+			});
 			if (!(quizMetadata.showCorrectAnswers && response.isLoggedIn)) {
 				//Cannot view the answers
 				let modalVisible = false;

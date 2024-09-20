@@ -1,6 +1,6 @@
 CREATE TABLE user (
     userID INT ZEROFILL AUTO_INCREMENT PRIMARY KEY NOT NULL,
-    emailAddress VARCHAR(320) NOT NULL,
+    emailAddress VARCHAR(320) NOT NULL UNIQUE,
     hashedPwd BIGINT ZEROFILL NOT NULL,
     userName VARCHAR(50) NOT NULL,
     dateOfBirth DATE NOT NULL,
@@ -46,7 +46,7 @@ CREATE TABLE question (
     timeLimit BIGINT,
     messageDuration BIGINT,
     maxpoints INT,
-    FOREIGN KEY(quizCode) REFERENCES quiz(quizCode),
+    FOREIGN KEY(quizCode) REFERENCES quiz(quizCode) ON UPDATE CASCADE ON DELETE CASCADE,
     PRIMARY KEY(quizCode, questionNumber)
 );
 
@@ -68,8 +68,12 @@ CREATE TABLE quizsession (
     emailAddress VARCHAR(320) NOT NULL,
     questionIndex INT UNSIGNED NOT NULL,
     questionsOrderJSON VARCHAR(2048) NOT NULL,
-    tempAnswersLogFileDir VARCHAR(100) NOT NULL,
+    tempAnswersLogFileDir VARCHAR(500) NOT NULL,
     quizPoints INT NOT NULL DEFAULT 0,
     numCorrectAnswers INT NOT NULL DEFAULT 0,
+    FOREIGN KEY(quizCode) REFERENCES quiz(quizCode) ON UPDATE CASCADE ON DELETE CASCADE,
+    FOREIGN KEY(emailAddress) REFERENCES user(emailAddress) ON DELETE CASCADE,
     PRIMARY KEY(quizCode, emailAddress)
 )
+
+/*The cascades are vital - DO NOT remove them. Doing so would cause countless problems with the server when modifying and deleting users and quizzes*/

@@ -12,6 +12,20 @@
     src:
         url("/server_data/server_static_resources/fonts/Kenarose/Kenarose.ttf");
 }
+@keyframes oscillationAnimation {
+    0% {
+        rotate: 0deg;
+    }
+    25% {
+        rotate: 10deg;
+    }
+    75% {
+        rotate: -10deg;
+    }
+    100% {
+        rotate: 0deg;
+    }
+}
 
 table {
     border-collapse:collapse;
@@ -69,7 +83,64 @@ div.menubar > .menubarentrydropdown:hover {
     translate: 0px 50%;
 }*/
 
-@media screen and (width <= 333px) {
+@media all and (min-width: 500px) {
+    div.menubar {
+        position: fixed;
+        padding:0px;
+        margin:0px;
+        top: 0px;
+        left: 0px;
+        width: 100%;
+        height: fit-content;
+        z-index: 2;
+        background: linear-gradient(180deg, skyblue 0% 50%, rgba(0, 0, 0, 0) 100%);
+        display: flex;
+        flex-direction: row;
+        justify-content: flex-start;
+        align-items: center;
+    }
+
+    .opensidebar {
+        display:none;
+    }
+    
+    div.menubar .buttonsdiv {
+        display: flex;
+        flex-wrap: wrap;
+        flex-direction: row;
+        flex-grow: 1;
+    }
+    
+    div.menubar .menubarentry {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-grow:0;
+        flex-shrink: 0;
+        border:groove 3px #777777;
+        border-radius: 5px;
+        background-color: #BBBBBB;
+        padding: 5px;
+        padding:1%;
+        margin:2px;
+        width: fit-content;
+        overflow: hidden;
+        color: #000000;
+        transition: background-color 0.5s ease-out, color 0.5s ease-out;
+    }
+    
+    div.menubar .menubarentry:hover {
+        background-color: #000000;
+        color: #BBBBBB;
+    }
+}
+
+
+@media all and (max-width: 500px) {
+    .opensidebar {
+        display:unset;
+    }
+    
     div.menubar {
         position: fixed;
         padding:0px;
@@ -138,59 +209,6 @@ div.menubar > .menubarentrydropdown:hover {
     }
 }
 
-@media screen and (width > 333px) {
-    div.menubar {
-        position: fixed;
-        padding:0px;
-        margin:0px;
-        top: 0px;
-        left: 0px;
-        width: 100%;
-        height: fit-content;
-        z-index: 2;
-        background: linear-gradient(180deg, skyblue 0% 50%, rgba(0, 0, 0, 0) 100%);
-        display: flex;
-        flex-direction: row;
-        justify-content: flex-start;
-        align-items: center;
-    }
-
-    .opensidebar {
-        display:none;
-    }
-    
-    div.menubar .buttonsdiv {
-        display: flex;
-        flex-wrap: wrap;
-        flex-direction: row;
-        flex-grow: 1;
-    }
-    
-    div.menubar .menubarentry {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        flex-grow:0;
-        flex-shrink: 0;
-        border:groove 3px #777777;
-        border-radius: 5px;
-        background-color: #BBBBBB;
-        padding: 5px;
-        padding:1%;
-        margin:2px;
-        width: fit-content;
-        overflow: hidden;
-        color: #000000;
-        transition: background-color 0.5s ease-out, color 0.5s ease-out;
-    }
-    
-    div.menubar .menubarentry:hover {
-        background-color: #000000;
-        color: #BBBBBB;
-    }
-}
-
-
 a.menubarentry {
     text-decoration:none;
 }
@@ -203,6 +221,7 @@ a.menubarentry {
     width:100%;
     height:100%;
     position:fixed;
+    display:flex;
     align-items:center;
     justify-content: center;
 }
@@ -218,6 +237,67 @@ a.menubarentry {
     width:75%;
     max-height:25%;
     height:25%;
+}
+
+#notificationsScrollDiv {
+    height:100%;
+    width:95%;
+    padding: 17px;
+    max-width:95%;
+    width:95%;
+    max-height:100%;
+    height:100%;
+    overflow-x:auto;
+    overflow-y:auto;
+    border:solid 1px black;
+    box-sizing:border-box;
+}
+
+@media screen and (max-width: 500px) {
+    #notificationsdiv {
+        background-color: #fefefe;
+        border: 1px solid #000000;
+        display: inline-block;
+        vertical-align: middle;
+        padding:3px;
+        position:fixed;
+        max-width:100%;
+        width:100%;
+        max-height:50%;
+        height:50%;
+    }
+}
+
+.notification {
+    border:solid 1px black;
+    padding:5px;
+}
+
+/*.notification .notificationheader*/ .horizontallySeparatedContent {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+}
+
+.notification .notificationdate {
+    font-size:15px;
+    font-family:Calibri;
+    color:#AAAAAA;
+    float:right;
+}
+
+.notification .notificationdata {
+    float:left;
+    font-size:15px;
+    color:#000000;
+    font-family:Calibri;
+}
+
+.notification .notificationcontentpeek {
+    padding:10px;
+    max-width:95%;
+    max-height:75px;
+    overflow:auto;
 }
 
 .flexColLayout {
@@ -298,7 +378,14 @@ span.content {
     min-height:15px;
 }
 
-span.content:empty::before {
+div.content {
+    padding: 3px;
+    border:solid 1px black;
+    min-width:50px;
+    min-height:15px;
+}
+
+span.content:empty::before, div.content:empty::before {
     color: #777777;
     font-family: Consolas;
     content: "Enter your value here";
@@ -418,13 +505,10 @@ div#quizzesframe {
     background-color: #01C7E9;
 }
 
-.fileInput {
-    display: none;
-}
-
 canvas#profilepicture {
     width:100%;
     height:100%;
+    border-radius: 15000px;
 }
 
 .dateDisplay {
@@ -506,4 +590,47 @@ div.dropdownbgdiv {
 .dropdownmenuoption:hover {
     background-color: #25BFDF;
     color: #FFFFFF;
+}
+
+.animatedButton {
+    color:#00FF00;
+    background-color:#0000FF;
+    font-family:Consolas;
+    font-size:30px;
+    transition: color 0.4s ease-out, background-color 0.4s ease-out;
+}
+
+.animatedButton:hover {
+    color:#770000;
+    background-color:#00FF00;
+}
+
+/*This class takes precedence over ALL else*/
+.hidden {
+    display:none !important;
+}
+
+.invalidFieldEntry::after {
+    --field-error-value: inherit;
+    display: block;
+    content: var(--field-error-value);
+    color: red;
+    font-family: "Arial";
+    font-size: 14px;
+    display: block;
+    transform-origin: center;
+    animation-duration:0.2s;
+    animation-name: oscillationAnimation;
+    animation-iteration-count: 3;
+}
+
+:has(.invalidFieldEntry) {
+    --field-error-value:"";
+}
+
+.modalsubmissionbutton {
+    padding: 5px;
+    background-color: blue;
+    color: white;
+    border-radius: 5px;
 }

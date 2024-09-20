@@ -8,19 +8,25 @@
 			const socket = io();
 			async function deleteaccount(deleteAllQuizzes) {
 				var xhr = new XMLHttpRequest();
-				xhr.open("POST", location.origin + "/logout");
+				xhr.open("DELETE", location.origin + "/deleteaccount");
 				xhr.setRequestHeader("Content-Type", "application/json");
-				xhr.responseType = "json"
-				xhr.send({deleteAllQuizzes});
+				//xhr.responseType = "json";
+				xhr.send(JSON.stringify({deleteAllQuizzes}));
 				try {
 					await new Promise(function(res, rej) {
-						xhr.onload = res;
+						xhr.onload = function() {
+							if (xhr.status === 200) {
+								res();
+							} else {
+								rej(xhr.response);
+							}
+						};
 						xhr.onerror = rej;
 					});
 					alert("Sucessfully deleted account");
 					window.location.href = location.origin;
 				} catch (e) {
-					alert("Account deletion failed! Please try again!");
+					alert(e);
 				}
 			}
 		</script>

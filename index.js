@@ -15,6 +15,7 @@ const io = new Server(server);
 const mysql = require("mysql");
 const { KEYS } = require("node-gyp/lib/log");
 const { connect } = require("http2");
+const { ChildProcess } = require("child_process");
 //const domparser = require("node-html-parser");
 //const sanitise = require('sanitize-html');
 //const { memoryUsage } = require("process");
@@ -32,7 +33,7 @@ const emailSocketIDMap = new Map();
 //Create map for email to db record id (have email map to multiple objects to allow the server to quickly fetch data from the email, obtained through the session id)
 const emailDBRecordMap = new Map();
 
-const cookiesRequireHTTPS = false;
+const cookiesRequireHTTPS = true;
 
 //Create map to map session ids to creation dates
 const sessionIDCreationDateMap = new Map();
@@ -80,21 +81,22 @@ const queryDB = function(sql, data = []) {
 
 //Store quiz data
 class QuizSession {
-	constructor(quizCode, emailAddress, quizQuestionIndex = 0, answersLogFileDir = "", quizPoints = 0, numCorrectAnswers = 0) {
+	constructor(quizCode, emailAddress, quizQuestionIndex = 0, answersLogFileDir = "", quizPoints = 0, numCorrectAnswers = 0, questionOrder = []) {
 		this.quizCode = quizCode;
 		this.emailAddress = emailAddress;
 		this.quizQuestionIndex = quizQuestionIndex;
-		this.questionOrder = [];
+		this.questionOrder;
 		this.answersLogFileDir = answersLogFileDir;
 		this.quizPoints = quizPoints;
 		this.numCorrectAnswers = numCorrectAnswers;
+		this.questionOrder = questionOrder;
 	}
 	static fromJSON(JSONData) {
 		let obj = JSON.parse(JSONData);
-		return new QuizSession(obj.quizCode, obj.emailAddress, obj.quizQuestionIndex, obj.answersLogFileDir, obj.quizPoints, obj.numCorrectAnswers);
+		return new QuizSession(obj.quizCode, obj.emailAddress, obj.quizQuestionIndex, obj.answersLogFileDir, obj.quizPoints, obj.numCorrectAnswers, obj.questionOrder);
 	}
 	static fromObject(obj) {
-		return new QuizSession(obj.quizCode, obj.emailAddress, obj.quizQuestionIndex, obj.answersLogFileDir, obj.quizPoints, obj.numCorrectAnswers);
+		return new QuizSession(obj.quizCode, obj.emailAddress, obj.quizQuestionIndex, obj.answersLogFileDir, obj.quizPoints, obj.numCorrectAnswers, obj.questionOrder);
 	}
 }
 
@@ -169,6 +171,125 @@ const toSQLDateTime = function(dateObj = new Date()) {
 	return `${("0000" + dateObj.getFullYear()).slice(-4)}-${("00" + (dateObj.getMonth() + 1)).slice(-2)}-${("00" + dateObj.getDate()).slice(-2)} ${("00" + (dateObj.getHours())).slice(-2)}:${("00" + (dateObj.getMinutes())).slice(-2)}:${("00" + (dateObj.getSeconds())).slice(-2)}`
 }
 
+const SQLFormats = {
+	DATE_ONLY:0,
+	DATE_TIME:1
+}
+
+Object.freeze(SQLFormats);
+
+const isCharNumeric = function(char) {
+	let code = char.charCodeAt(0);
+	return code >= 48 && code <= 57;
+}
+
+const formatTemplateChars = ["Y", "M", "D", "h", "m", "s"];
+
+const isSQLFormatted = function(dateStr, formatStr) {
+	//Format as date field (YYYY-MM-DD)
+	if (typeof dateStr !== "string") {
+		return false;
+	}
+	if (dateStr.length !== formatStr.length) {
+		return false;
+	}
+	let firstChar = null;
+	let isCharTemplate = false;
+	let wasPrevCharTemplate;
+	let templateData = {};
+	for (let i = 0; i < dateStr.length; i++) {
+		wasPrevCharTemplate = isCharTemplate;
+		isCharTemplate = formatTemplateChars.indexOf(formatStr[i]) !== -1;
+		//Short-circuit AND to reduce unnecessary computations
+		if (firstChar === null && isCharTemplate) {
+			firstChar = formatStr[i];
+			templateData[firstChar] = {index: i, value: ""};
+		}
+		if (!(wasPrevCharTemplate || isCharTemplate) || (formatStr[i] !== firstChar && isCharTemplate)) {
+			//Two successive non-template characters OR abrupt change in template chars without ONE non-template char separator: malformed template
+			throw new IllegalArgumentError("Malformed formatting string");
+		}
+		//Check if the separators don't equal or if the character replacing the template is not numeric
+		if (!isCharNumeric(dateStr[i]) && isCharTemplate) {
+			return false;
+		}
+		if (!isCharTemplate) {
+			//Reset first character
+			firstChar = null;
+			if (dateStr[i] !== formatStr[i]) {
+				return false;
+			}
+		} else {
+			//Push this number to the string
+			templateData[firstChar].value += dateStr[i];
+		}
+	}
+	//Syntax has been checked and is probably correct if we are here... but what about value ranges? No month has 32 days, has it?
+	for (let key in templateData) {
+		switch (key) {
+			case "Y": {
+				break;
+			}
+			case "M": {
+				if (Number(templateData[key].value) > 12) {
+					return false;
+				} else {
+					break;
+				}
+			}
+			case "D": {
+				if (Number(templateData[key].value) > 31) {
+					return false;
+				} else {
+					break;
+				}
+			}
+			case "h": {
+				if (Number(templateData[key].value) > 23) {
+					return false;
+				} else {
+					break;
+				}
+			}
+			case "m": {
+				if (Number(templateData[key].value) > 59) {
+					return false;
+				} else {
+					break;
+				}
+			}
+			case "s": {
+				if (Number(templateData[key].value) > 59) {
+					return false;
+				} else {
+					break;
+				}
+			}
+		}
+	}
+	//Syntax and value checks passed. Valid date!
+	return true;
+	/*switch (format) {
+		case SQLFormats.DATE_ONLY: {
+			//Format as date field (YYYY-MM-DD)
+			if (dateStr.length !== 10) {
+				return false;
+			}
+			for (let i = 0; i < dateStr.length) {
+
+			}
+			break;
+		}
+		case SQLFormats.DATE_TIME: {
+			//Format as date time field (YYYY-MM-DD HH:MM:SS)
+			if (dateStr.length !== 21) {
+				return false;
+			}
+			break;
+		}
+	}*/
+}
+
 //TODO: actually fill this function with data
 const sanitiseUserInputForHTML = function(data) {
 	return data;
@@ -220,6 +341,7 @@ const mapModFuncs = {
 			/*await queryDB(`INSERT INTO quizsession (quizCode, emailAddress, questionIndex, questionsOrderJSON, tempAnswersLogFileDir, quizPoints, numCorrectAnswers)
 				VALUES (?, ?, ?, ?, ?, ?, ?)`, [oldQuizSession.quizCode, oldQuizSession.emailAddress, oldQuizSession.quizQuestionIndex, JSON.stringify(oldQuizSession.questionOrder), oldQuizSession.answersLogFileDir]);*/
 			//Write the quiz session to the DB if logged in (i.e.: if oldQuizSession, which is obtained from a map with its respective email as its key, is not undefined)
+			//No need to await this function; its execution is independent of its argument's session's presence in the email-session map
 			saveQuizSession(oldQuizSession);
 			emailQuizSessionMap.delete(correspondingEmail);
 		}
@@ -635,14 +757,15 @@ app.get("/viewquizzes", function(req, res) {
 app.get("/editquiz", function(req, res) {
 	res.sendFile(__dirname + "/server_data/server_pages/Quiz_Editing_Page.html");
 });
+
 //TODO: Get back to this
-app.get("/getexistingquizcodes", async function(req, res) {
+/*app.get("/getexistingquizcodes", async function(req, res) {
 	var codes = await new Promise(function(res, rej) {
 		fs.readdir(__dirname + "/server_data/existingquizzes", function(err, arr) {if (!err) {res(arr)} else {rej(err)}});
 	});
 	res.writeHead(200, {"Content-Type":"application/json"});
 	res.end(JSON.stringify(codes));
-});
+});*/
 app.get("/login", function(req, res) {
 	if (sessionIDEmailMap.get(getCookies(req).sessionid) == undefined) {
 		res.sendFile(__dirname + "/server_data/server_templates/loginpage.html");
@@ -699,6 +822,11 @@ app.post("/login", async function(req, res) {
 	if (hashedpwd === password) {
 		correctpassword = true;
 	}*/
+	//TODO: Test the sign-in's authenticity
+	if (emailSessionIDMap.get(req.body.email) != undefined) {
+		//Check if the sessionID held by the email is still valid to prevent permanent account lock-outs. If not, this function should delete the email-session id, effectively loggin out the user
+		await updateSessionID(emailSessionIDMap.get(req.body.email));
+	}
 	//Some other device is already logged in using this email address
 	if (emailSessionIDMap.get(req.body.email) != undefined) {
 		res.writeHead(401, {"Content-Type":"text/plain"});
@@ -726,7 +854,7 @@ app.post("/login", async function(req, res) {
 			res.end();
 		} else {
 			res.writeHead(403, {"Content-Type":"text/plain"});
-			res.end("Incorrect Password. Please try again");
+			res.end("Incorrect password. Please try again");
 		}
 	} else {
 		res.writeHead(403, {"Content-Type":"text/plain"});
@@ -734,17 +862,152 @@ app.post("/login", async function(req, res) {
 	}
 	//readstream.destroy();
 });
-app.get("/modifyuserdata", function(req, res) {
-	if (req.session.email != undefined) {
+app.get("/modifyuserdata", async function(req, res) {
+	let sessionid = getCookies(req).sessionid;
+
+	//Check if the user's session id is outdated and make the necessary changes if so
+	await updateSessionID(sessionid);
+
+	let userEmail = sessionIDEmailMap.get(sessionid);
+
+	if (userEmail != undefined) {
 		res.sendFile(__dirname + "/server_data/server_templates/modifycredentialspage.html");
 	} else {
 		res.writeHead(200, {"Content-Type":"text/html"});
 		res.end(`<html><head><title>Cannot modify properties</title></head><body><span>You are not logged in to an account and hence cannot modify your account's properties. Click <a href="/login">here</a> to login or click <a href="/">here</a> to go to home</span></body></html>`);
 	}
 });
-app.post("/modifyuserdata", function(req, res) {
-	if (req.session.code === req.cookies.sessionid) {
-		var p = [];
+const invalidFieldValues = ["", null, undefined];
+app.put("/modifyuserdata", async function(req, res) {
+	let sessionid = getCookies(req).sessionid;
+
+	//Check if the user's session id is outdated and make the necessary changes if so
+	await updateSessionID(sessionid);
+
+	let userEmail = sessionIDEmailMap.get(sessionid);
+
+	if (userEmail != undefined) {
+		//Retrieve the user's database ID and load it into memory if not present in the map
+		let userDBID = emailDBRecordMap.get(userEmail);
+		if (userDBID == undefined) {
+			//Must retrieve user's DB-ID from the database
+			userDBID = await queryDB(`SELECT userID FROM user WHERE emailAddress = ?`, [userEmail]);
+			if (userDBID.length < 1) {
+				//The user does not exist, but this was retrieved server-side, so something is horribly wrong. Return error code and stop method execution.
+				res.writeHead(500, {"Content-Type":"text/plain"});
+				res.end("Something went wrong server-side! Very probably not your fault");
+				return;
+			} else if (userDBID.length > 1) {
+				//Something is terribly, terribly wrong (multiple users with the same email address). Throw a fatal server-side error
+				res.writeHead(500, {"Content-Type":"text/plain"});
+				res.end("Multiple users have the same email address (inside DB)");
+				throw new CatastrophicError("Multiple users have the same email address (inside DB)");
+				//No need for return; the error stops execution of this function and propagates up the stack
+			}
+			userDBID = userDBID[0].userID;
+			emailDBRecordMap.set(userEmail, userDBID);
+		}
+		//Decode the payload
+		var obj = formatHandler.decode(req.body);
+		//Turn the buffer in object member 'userData' into an object by first turning it into a JSON string
+		try {
+			obj.userData = JSON.parse(obj.userData.toString());
+		} catch (e) {
+			res.writeHead(400, {"Content-Type":"text/plain"});
+			res.end("The JSON storing the updated data is malformed");
+			return;
+		}
+
+		let finalisedObject = {};
+
+		//Only attempt to store the changed attributes if their new values are valid (i.e.: not empty)
+		if (invalidFieldValues.indexOf(obj.userData.username) === -1) {
+			finalisedObject.username = obj.userData.username;
+		}
+
+		if (isSQLFormatted(obj.userData.dateofbirth, "YYYY-MM-DD")) {
+			finalisedObject.dateOfBirth = obj.userData.dateofbirth;
+		}
+
+		if (invalidFieldValues.indexOf(obj.userData.password) === -1) {
+			finalisedObject.hashedPwd = hash(obj.userData.password, 10n**9n*9n+9n, 31n);
+		}
+
+		if (obj.profilePic.length > 0) {
+			//Valid image
+			
+			let callbackGenerator = function(res, rej) {
+				return function(err) {
+					if (err) {
+						console.log(err);
+						rej(err);
+					} else {
+						res();
+					}
+				}
+			};
+
+			//DO NOT append to the file. Instead, overwrite its contents.
+			let writeStream = fs.createWriteStream(`${__dirname}/server_data/userprofilepics/user${Number(userDBID)}img.png`, {flags: "w"});
+			await new Promise(function(res, rej) {
+				writeStream.write(obj.profilePic, callbackGenerator(res, rej));
+			}).then(function() {
+				return new Promise(function(res, rej) {
+					writeStream.end(callbackGenerator(res, rej));
+				});
+			});
+			writeStream.destroy();
+			finalisedObject.profilePic = `server_data/userprofilepics/user${Number(userDBID)}img.png`;
+		} else {
+			//Invalid image - use default image
+			finalisedObject.profilePic = `server_data/userprofilepics/defaultuserimg.png`;
+			await new Promise(function(res, rej) {
+				fs.unlink(`${__dirname}\\server_data\\userprofilepics\\user${userDBID}img.png`, function(err) {
+					if (!err) {
+						//File has been deleted successfully
+						res();
+					} else if (err.code === "ENOENT") {
+						//There is the possibility that the user's profile picture is the default
+						res();
+					} else {
+						//Something is terribly, terribly wrong.
+						rej();
+					}
+				});
+			});
+		}
+
+		let queryString = "UPDATE user SET ";
+		let queryValuesArr = [];
+
+		let fokeys = Object.keys(finalisedObject);
+
+		for (let i = 0; i < fokeys.length; i++) {
+			if (i === fokeys.length - 1) {
+				queryString += `${fokeys[i]} = ? `;
+			} else {
+				queryString += `${fokeys[i]} = ?, `;
+			}
+			queryValuesArr.push(finalisedObject[fokeys[i]]);
+		}
+
+		queryString += "WHERE userID = ?";
+		queryValuesArr.push(userDBID);
+
+		try {
+			await queryDB(queryString, queryValuesArr);
+			res.writeHead(200, {"Content-Type":"text/plain"});
+			res.end();
+		} catch (e) {
+			console.log(e);
+			res.writeHead(500, {"Content-Type":"text/plain"});
+			res.end("Something went wrong while applying the new user data");
+		}
+
+
+
+
+		/*var p = [];
 		var readstream = fs.createReadStream(__dirname + "/server_data/signedupclients/" + encodeURIComponent(req.session.email).replace(/[*]/g, "%2A") + "/userStats.txt");
 		readstream.on("error", function(err) {
 			if (err.code == "ENOENT") {
@@ -772,41 +1035,35 @@ app.post("/modifyuserdata", function(req, res) {
 			for await (var line of lreader) {
 				if (i !== 0) {
 					writestream.write("\n");
-					/*var firstline = JSON.parse(line);
-					for (let i = 0; i < newfieldkeys.length; i++) {
-						if (newfields[newfieldkeys[i]] != "sessionid" && newfields[newfieldkeys[i]] != "email") {
-							if (newfieldkeys[i] == "password") {
-								firstline[newfieldkeys[i]] = hash(newfields[newfieldkeys[i]], 10n**9n+9n, 31n);
-							} else {
-								firstline[newfieldkeys[i]] = newfields[newfieldkeys[i]];
-							}
-						}
-					}*/
 				}
 				if (i === userAccountPropLines.EMAIL) {
 					//Can NEVER be changed. EVER.
 					writestream.write(line);
 				} else if (i === userAccountPropLines.HASHEDPASSWORD) {
-					if (req.body.newfields.password == undefined /*undefined or null ONLY*/ || req.body.newfields.password === "") {
+					if (req.body.newfields.password == undefined //undefined or null ONLY
+					|| req.body.newfields.password === "") {
 						writestream.write(line);
 					} else {
 						//Password MUST be hashed! Server security 101
 						writestream.write(hash(req.body.newfields.password, 10n**9n+9n, 31n));
 					}
 				} else if (i === userAccountPropLines.USERNAME) {
-					if (req.body.newfields.username == undefined /*undefined or null ONLY*/ || req.body.newfields.username === "") {
+					if (req.body.newfields.username == undefined //undefined or null ONLY
+					|| req.body.newfields.username === "") {
 						writestream.write(line);
 					} else {
 						writestream.write(req.body.newfields.username);
 					}
 				} else if (i === userAccountPropLines.DATEOFBIRTH) {
-					if (req.body.newfields.dateofbirth == undefined /*undefined or null ONLY*/ || isNaN(req.body.newfields.dateofbirth)) {
+					if (req.body.newfields.dateofbirth == undefined //undefined or null ONLY
+					|| isNaN(req.body.newfields.dateofbirth)) {
 						writestream.write(line);
 					} else {
 						writestream.write(req.body.newfields.dateofbirth.toString());
 					}
 				} else if (i === userAccountPropLines.PROFILEPIC) {
-					if (req.body.newfields.profilepic == undefined /*undefined or null ONLY*/ || req.body.newfields.profilepic === "") {
+					if (req.body.newfields.profilepic == undefined //undefined or null ONLY
+					|| req.body.newfields.profilepic === "") {
 						writestream.write(line);
 					} else {
 						writestream.write(req.body.newfields.profilepic);
@@ -830,10 +1087,10 @@ app.post("/modifyuserdata", function(req, res) {
 			});
 			res.writeHead(200, {"Content-Type":"application/json"});
 			res.end(JSON.stringify({error:null, state:"success", data:null}));
-		});
+		});*/
 	} else {
-		res.writeHead(403, {"Content-Type":"application/json"});
-		res.end(JSON.stringify({error:"You are not authenticated", state:"failure", data:null}));
+		res.writeHead(403, {"Content-Type":"text/plain"});
+		res.end("You are not authenticated");
 	}
 });
 app.post("/getuserdata", async function(req, res) {
@@ -873,7 +1130,18 @@ app.post("/getuserdata", async function(req, res) {
 	}
 	//No need for sanitiseUserInputForSQL function here; the data in the array is server-mapped by above loop
 	let results = (await queryDB(`SELECT ${validFieldNames.join(", ")} FROM user
-	WHERE emailAddress = ?`, [req.body.email]))[0];
+	WHERE emailAddress = ?`, [req.body.email]));
+	if (results.length === 0) {
+		res.writeHead(404, {"Content-Type":"text/plain"});
+		res.end("The email address you have specified does not exist or cannot be found");
+		return;
+	} else if (results.length > 1) {
+		//The email address belongs to more than one user!
+		res.writeHead(500, {"Content-Type":"text/plain"});
+		res.end("Catastrophic server-side error: Multiple users share the same email address. Server crashing...");
+		throw new CatastrophicError("Catastrophic server-side error: Multiple users share the same email address. Server crashing...");
+	}
+	results = results[0];
 	for (let field of validFieldNames) {
 		if (field === "emailAddress") {
 			fieldValueMap.email = results[field];
@@ -892,7 +1160,8 @@ app.post("/getuserdata", async function(req, res) {
 		try {
 			//Read the image file and encode it inside the JCat object with the JSONString
 			let imgBuf = await new Promise(function(res, rej) {
-				fs.readFile(`${__dirname}\\server_data\\${results.profilepic}`, function(err, data) {
+				//"server_data" is included within profile pic directory
+				fs.readFile(`${__dirname}\\${results.profilepic}`, function(err, data) {
 					if (!err) {
 						res(data);
 					} else {
@@ -991,18 +1260,104 @@ app.post("/logout", async function(req, res) {
 	}
 });
 //TODO: Look into this, too
-app.get("/deleteaccount", function(req, res) {
-	if (req.session.code === req.cookies.sessionid && req.session.email != undefined) {
+app.get("/deleteaccount", async function(req, res) {
+	let sessionid = getCookies(req).sessionid;
+
+	//Check if session id is still valid
+	await updateSessionID(sessionid);
+
+	let userEmail = sessionIDEmailMap.get(sessionid);
+
+	if (userEmail != undefined) {
 		res.sendFile(__dirname + "/server_data/server_templates/deleteaccountpage.html");
 	} else {
 		res.writeHead(200, {"Content-Type":"text/html"});
 		res.end(`<html><head><title>You are not logged in!</title></head><body><span>You are not logged in to an account! To log in,&nbsp;<a href = "/login">click here</a></span></body></html>`);
 	}
 });
-app.post("/deleteaccount", async function(req, res) {
-	var parr = [];
-	if (req.session.code === req.cookies.sessionid && req.session.email != undefined) {
-		delete emailSocketIds[req.session.email];
+app.delete("/deleteaccount", async function(req, res) {
+	//var parr = [];
+	let sessionid = getCookies(req).sessionid;
+
+	//Check if session id is still valid
+	await updateSessionID(sessionid);
+
+	let userEmail = sessionIDEmailMap.get(sessionid);
+	let userCorrectHashedPwd;
+
+	if (userEmail != undefined) {
+		let userDBID = emailDBRecordMap.get(userEmail);
+
+		//Retrieve the userID from the DB regardless of its presence, since the password will be fetched with it, as it would always be
+		userDBID = await queryDB(`SELECT hashedPwd, userID FROM user WHERE emailAddress = ?`, [userEmail]);
+		switch (userDBID.length) {
+			case 0:
+				//User does not exist (i.e.: no record is associated with this email address)
+				res.writeHead(500, {"Content-Type":"text/plain"});
+				res.end("Something went wrong whilst validating your identity server-side!");
+				return;
+			case 1:
+				//We have successfully retrieved the user's DB ID
+				userCorrectHashedPwd = BigInt(userDBID[0].hashedPwd);
+				userDBID = userDBID[0].userID;
+				break;
+			default:
+				//The email address belongs to more than one user!
+				res.writeHead(500, {"Content-Type":"text/plain"});
+				res.end("Catastrophic server-side error: Multiple users share the same email address. Server crashing...");
+				throw new CatastrophicError("Catastrophic server-side error: Multiple users share the same email address. Server crashing...");
+		}
+		//Cache this value to prevent later retrievals in the same session
+		emailDBRecordMap.set(userEmail, userDBID);
+	
+		//Verify whether or not the user entered the correct password
+		if (typeof req.body.password !== "string") {
+			//Incorrect password! Must be a string! (Measure to prevent error when hashing non-string)
+			res.writeHead(403, {"Content-Type":"text/plain"});
+			res.end("Incorrect password! Please try again");
+			return;
+		}
+
+		if (userCorrectHashedPwd.toString() !== hash(req.body.password, 10n**9n*9n+9n, 31n)) {
+			//Incorrect password!
+			res.writeHead(403, {"Content-Type":"text/plain"});
+			res.end("Incorrect password! Please try again");
+			return;
+		}
+	
+		//Delete all the quizzes created by the account or remove their owner
+		if (req.body.deleteAllQuizzes) {
+			await queryDB(`DELETE FROM quiz WHERE userID = ?`, [userDBID]);
+		} else {
+			//Leave quizzes
+			await queryDB(`UPDATE quiz
+			SET userID = NULL
+			WHERE userID = ?`, [userDBID]);
+		}
+		//Delete the user from the DB
+		await queryDB(`DELETE FROM user WHERE userID = ?`, [userDBID]);
+		//Delete the user's profile picture if it is not the default profile picture
+		await new Promise(function(res, rej) {
+			fs.unlink(`${__dirname}\\server_data\\userprofilepics\\user${userDBID}img.png`, function(err) {
+				if (!err) {
+					//File has been deleted successfully
+					res();
+				} else if (err.code === "ENOENT") {
+					//There is the possibility that the user's profile picture is the default
+					res();
+				} else {
+					//Something is terribly, terribly wrong.
+					rej();
+				}
+			});
+		});
+
+		//Delete the user's session and cookie, effectively logging the user out
+		await mapModFuncs.deleteFromEmail(userEmail);
+		res.cookie("sessionid", null, {httpOnly:true, secure:cookiesRequireHTTPS, sameSite:"strict", maxAge:0});
+		res.writeHead(200, {"Content-Type":"text/plain"});
+		res.end();
+		/*delete emailSocketIds[req.session.email];
 		req.session.delete();
 		res.cookie("sessionid", null, {maxAge:0});
 		if (req.body.deleteAllQuizzes) {
@@ -1068,13 +1423,12 @@ app.post("/deleteaccount", async function(req, res) {
 				res.writeHead(200, {"Content-Type":"text/plain"});
 				res.end();
 			});
-		}
+		}*/
 	} else {
 		res.writeHead(403, {"Content-Type":"text/plain"});
 		res.end("You are not authenticated");
 	}
 });
-//TODO: get back to this
 app.get("/signup", function(req, res) {
 	if (sessionIDEmailMap.get(getCookies(req).sessionid) == undefined) {
 		res.sendFile(__dirname + "/server_data/server_templates/signuppage.html");
@@ -1127,8 +1481,14 @@ app.post("/signup", async function(req, res) {
 		//Write the user's data to the database (FIX profilePic VALUE)
 		let recordData;
 		try {
-			recordData = await queryDB(`INSERT INTO user (emailAddress, hashedPwd, userName, dateOfBirth, profilePic, personalDescription)
-				VALUES (?, ?, ?, ?, '', ?)`, [obj.userData.email, hash(obj.userData.password, 10n**9n*9n+9n, 31n), obj.userData.username, obj.userData.dateofbirth, obj.userData.personalDescription]);
+			recordData = await queryDB(`INSERT INTO user (emailAddress, hashedPwd, userName, dateOfBirth, personalDescription)
+			VALUES (?, ?, ?, ?, ?)`, [
+				obj.userData.email,
+				hash(obj.userData.password, 10n**9n*9n+9n, 31n),
+				obj.userData.username,
+				obj.userData.dateofbirth,
+				obj.userData.personalDescription
+			]);
 		} catch (e) {
 			//DB error when creating table, typically due to invalid data provided by the client
 			if (e.code == "ER_PARSE_ERROR") {
@@ -1141,25 +1501,41 @@ app.post("/signup", async function(req, res) {
 			}
 		}
 
-		//Create write stream to local file for profile picture
-		var writestream = fs.createWriteStream(`${__dirname}\\server_data\\userprofilepics\\user${recordData.insertId}img.png`);
-		await new Promise(function(res, rej) {
-			writestream.write(obj.profilePic, function(err) {
+		//Generates a callback with a closure scope unique to each and every function with potentially different promise resolution and rejection function references
+		let callbackGenerator = function(res, rej) {
+			return function(err) {
 				if (err) {
 					console.log(err);
 					rej(err);
 				} else {
 					res();
 				}
-			});
-		});
-		//Ensure that all data has been flushed before destroying the stream
-		writestream.end();
-		writestream.destroy();
-		//Set link to profile picture
-		await queryDB(`UPDATE user
-			SET profilePic='userprofilepics/user${recordData.insertId}img.png'
+			}
+		};
+
+		if (obj.profilePic.length === 0) {
+			//No valid profile picture provided: set link to default profile picture
+			await queryDB(`UPDATE user
+			SET profilePic='server_data/userprofilepics/defaultuserimg.png'
 			WHERE userID = ${recordData.insertId}`);
+		} else {
+			//Create write stream to local file for profile picture
+			var writestream = fs.createWriteStream(`${__dirname}\\server_data\\userprofilepics\\user${recordData.insertId}img.png`);
+			//Await stream writing, ending and destruction
+			await new Promise(function(res, rej) {
+				writestream.write(obj.profilePic, callbackGenerator(res, rej));
+			}).then(function() {
+				return new Promise(function(res, rej) {
+					//Ensure that all data has been flushed before destroying the stream
+					writestream.end(callbackGenerator(res, rej));
+				});
+			})
+			writestream.destroy();
+			//Set link to profile picture
+			await queryDB(`UPDATE user
+			SET profilePic='server_data/userprofilepics/user${recordData.insertId}img.png'
+			WHERE userID = ${recordData.insertId}`);
+		}
 
 		/*req.session.email = req.body.email;
 		req.session.username = req.body.username;
@@ -1217,11 +1593,12 @@ app.post("/signup", async function(req, res) {
 	});*/
 });
 
-//TODO: Ummm.... fishy. Look into it
+//Non-authenticated users' session id is generated here
 app.post("/modifysocketid", async function(req, res) {
+	let sessionid = getCookies(req).sessionid;
 	//Check whether session id is outdated BEFORE reading the maps
-	await updateSessionID(getCookies(req).sessionid);
-	let correspondingEmail = sessionIDEmailMap.get(getCookies(req).sessionid);
+	await updateSessionID(sessionid);
+	let correspondingEmail = sessionIDEmailMap.get(sessionid);
 	if (correspondingEmail == undefined) {
 		let socket = connectedSocketsMap.get(req.body.newSocketID);
 		if (socket == undefined) {
@@ -1231,17 +1608,24 @@ app.post("/modifysocketid", async function(req, res) {
 		}
 		//Generate the random UUID
 		var randomcode = createUUID();
+		if (socket.currentDeleteSessionMapFunc !== undefined) {
+			//Remove memory leak caused by multiple requests without the disconnect event ever being fired
+			socket.removeListener("disconnect", socket.currentDeleteSessionMapFunc);
+		}
 		mapModFuncs.insertLoggedOutSessionIDSocketID(randomcode, req.body.newSocketID);
 		let deleteSessionMapFunc = function() {
 			//Remove memory leak by deleting old map entries on redundancy (before disconnect)
-			//TODO: This is the only function invocation involving the manipulation of these maps, sometimes causing errors - look into it 
+			//TODO: This is the only function invocation involving the manipulation of these maps, sometimes causing errors - look into it
+			//TODO: Invoking this function also attempts to delete the same socket id from the connectedSockets map, which is invariably deleted on socket disconnect (as emphasised in EVERY socket disconnect handler)
 			mapModFuncs.deleteLoggedOutDataFromSocketID(req.body.newSocketID);
 			socket.removeListener("disconnect", deleteSessionMapFunc);
+			socket.currentDeleteSessionMapFunc = undefined;
 		}
+		socket.currentDeleteSessionMapFunc = deleteSessionMapFunc;
 		socket.on("disconnect", deleteSessionMapFunc);
 		res.cookie("sessionid", randomcode, {maxAge:sessionDuration, httpOnly:true, secure:cookiesRequireHTTPS, sameSite:"strict"});
-		res.writeHead(200, {"Content-Type":"text/plain"});
-		res.end("Action complete, however it has been done in logged-out mode");
+		res.writeHead(200, {"Content-Type":"application/json"});
+		res.end(JSON.stringify({code: "nonauthSession", message: "Action complete, however it has been done in logged-out mode"}));
 	} else /*if (correspondingEmail === req.cookies.sessionid)*/ {
 		/*req.session.socketid = req.body.newsocketid;
 		emailSocketIds[req.session.email].socketid = req.body.newsocketid;*/
@@ -1251,18 +1635,113 @@ app.post("/modifysocketid", async function(req, res) {
 	}
 });
 
-//TODO: revamp; do this through socket.io
-app.post("/deletesocketreference", function(req, res) {
+//Redundant: done through socket.io in "/modifysocketid"
+/*app.post("/deletesocketreference", function(req, res) {
 	if (req.session.code == undefined) {
 		res.writeHead(304, {"Content-Type":"texp/plain"});
 		res.end("You are not authenticated");
 	} else if (req.session.code === req.cookies.sessionid) {
 		delete emailSocketIds[req.body.email];
 	}
-});
+});*/
 
-app.post("/deletequiz", async function(req, res) {
-	var parr = [];
+app.delete("/deletequiz", async function(req, res) {
+	//Get the user's session ID
+	let sessionid = getCookies(req).sessionid;
+
+	//Check whether session id is outdated and update the maps accordingly BEFORE attempting to retrieve the user's email address
+	await updateSessionID(sessionid);
+	
+	//Get the user's email address (if any)
+	let userEmail = sessionIDEmailMap.get(sessionid);
+
+	//Prevent attempting to delete a quiz of code "undefined"
+	if (req.query.qc == undefined) {
+		res.writeHead(400, {"Content-Type": "text/plain"});
+		res.end("You have not specified the quiz which you wish to delete. Please specify its code in the \"qc\" parameter of the request's query string");
+		return;
+	}
+
+	//Check if user is logged in (authenticated)
+	if (userEmail == undefined) {
+		res.writeHead(401, {"Content-Type": "text/plain"});
+		res.end("You are not authenticated (logged in to an account) and are consequently unable to delete your quizzes");
+		return;
+	}
+
+	//Check if the user owns this quiz - SERVER-SIDE VALIDATION
+	let userCorrectHashedPwd;
+	let userDBID = emailDBRecordMap.get(userEmail);
+	//if (userDBID == undefined) {
+		//Retrieve the user's DB ID from the DB regardless of its presence in the map, since we also need to unconditionally retrieve the user's hashed password
+		userDBID = await queryDB(`SELECT userID, hashedPwd FROM user WHERE emailAddress = ?`, [userEmail]);
+		switch (userDBID.length) {
+			case 0:
+				//User does not exist (i.e.: no record is associated with this email address)
+				res.writeHead(500, {"Content-Type":"text/plain"});
+				res.end("Something went wrong whilst validating your identity server-side!");
+				return;
+			case 1:
+				userCorrectHashedPwd = BigInt(userDBID[0].hashedPwd);
+				userDBID = userDBID[0].userID;
+				break;
+			default:
+				//The email address belongs to more than one user!
+				res.writeHead(500, {"Content-Type":"text/plain"});
+				res.end("Catastrophic server-side error: Multiple users share the same email address. Server crashing...");
+				throw new CatastrophicError("Catastrophic server-side error: Multiple users share the same email address. Server crashing...");
+		}
+		//Cache this value to prevent later retrievals in the same session
+		emailDBRecordMap.set(userEmail, userDBID);
+	//}
+	//Check if the correct password has been entered
+	//console.log(userCorrectHashedPwd, req.query.pwd, hash(req.query.pwd, 10n**9n*9n+9n, 31n))
+	if (userCorrectHashedPwd.toString() !== hash(req.query.pwd, 10n**9n*9n+9n, 31n)) {
+		//Incorrect password!
+		res.writeHead(403, {"Content-Type":"text/plain"});
+		res.end("Incorrect password! Please try again");
+		return;
+	}
+
+	let quizData = await queryDB(`SELECT quizTitle, userID FROM quiz WHERE quizCode = ?`, [req.query.qc]);
+	switch (quizData.length) {
+		case 0:
+			//The quiz in particular does not exist
+			res.writeHead(404, {"Content-Type":"text/plain"});
+			res.end(`The quiz of code \"${req.query.qc}\" cannot be found or does not exist.`);
+			return;
+		case 1:
+			//Necessary information about the quiz has been retrieved
+			quizData = quizData[0];
+			break;
+		default:
+			//The quiz code belongs to more than one quiz!
+			res.writeHead(500, {"Content-Type":"text/plain"});
+			res.end("Catastrophic server-side error: Multiple quizzes share the same quiz code. Server crashing...");
+			throw new CatastrophicError("Catastrophic server-side error: Multiple quizzes share the same quiz code. Server crashing...");
+	}
+	
+	if (quizData.userID !== userDBID) {
+		//The user has not created this quiz. Do not attempt to delete it
+		res.writeHead(403, {"Content-Type":"text/plain"});
+		res.end("You are not this quiz's creator and therefore cannot delete it");
+		return;
+	}
+	
+	//TODO: Perform validation to kick out people currently taking part in the quiz
+	//The user owns this quiz. Attempt to delete it, its questions and stored user sessions of that quiz. Due to the cascade, deleting the quiz will delete all associated questions and quiz sessions
+	queryDB(`DELETE FROM quiz WHERE quizCode = ?`, [req.query.qc])
+	/*await Promise.all([
+		queryDB(`DELETE FROM quizsession WHERE quizCode = ?`, [req.query.qc]),
+		queryDB(`DELETE FROM question WHERE quizCode = ?`, [req.query.qc]),
+		queryDB(`DELETE FROM quiz WHERE quizCode = ?`, [req.query.qc])
+	]);*/
+
+	//Inform the user that the quiz has been deleted successfully
+	res.writeHead(200, {"Content-Type":"text/plain"});
+	res.end(`Quiz of code "${req.query.qc}", entitled "${quizData.quizTitle}" has been deleted successfully`);
+
+	/*var parr = [];
 	if (req.session.code === req.cookies.sessionid && req.session.email != undefined) {
 		var readstream = fs.createReadStream(__dirname + "/server_data/signedupclients/" + encodeURIComponent(req.session.email).replace(/[*]/g, "%2A") + "/userStats.txt");
 		parr.push(new Promise(function(res, rej) {readstream.on("close", res)}));
@@ -1364,11 +1843,11 @@ app.post("/deletequiz", async function(req, res) {
 	} else {
 		res.writeHead(403, {"Content-Type":"application/json"});
 		res.end(JSON.stringify({error:"You are not authenticated and hence cannot delete your quizzes", state:"failure", data:null}));
-	}
+	}*/
 });
 
 app.post("/sendnewquiz", async function(req, res) {
-	var parr = [];
+	//var parr = [];
 	//Check whether session id is outdated BEFORE reading the maps
 	let cookies = getCookies(req);
 	await updateSessionID(cookies.sessionid);
@@ -1476,7 +1955,7 @@ app.post("/sendnewquiz", async function(req, res) {
 			}
 			let sentData;
 			//Function to wait for incoming data and automatically reject within 5 seconds if no data is provided or the client disconnects
-			let dataWaitPromiseFunc = function(res, rej) {
+			/*let dataWaitPromiseFunc = function(res, rej) {
 				let hasActivityOccurred = false;
 				let dataFunc = function(data) {
 					//Prevent the promise from being rejected in the future
@@ -1578,6 +2057,134 @@ app.post("/sendnewquiz", async function(req, res) {
 			} catch (e) {
 				console.log(e);
 				userSocket.emit("streamwritefailed");
+				return;
+			}*/
+			let dataWaitPromiseFunc = function(event, delay = 5000) {
+				return function(res, rej) {
+					let hasActivityOccurred = false;
+					let dataFunc = function(data) {
+						//Prevent the promise from being rejected in the future
+						hasActivityOccurred = true;
+						removeListeners();
+						res(data);
+					}
+					//To be executed when the quiz transmission finishes
+					let transferFinishFunc = function() {
+						hasActivityOccurred = true;
+						questionsBeingSent = false;
+						removeListeners();
+						res({code: "streamComplete", message: "Success: the transfer has been completed"});
+					}
+		
+					//To be invoked after socket "disconnect" event
+					let socketDisconnectHandler = function() {
+						removeListeners();
+						rej("Error: the socket has disconnected during the stream");
+					}
+		
+					//Function to remove socket listeners whenever about to resolve or reject promise
+					let removeListeners = function() {
+						userSocket.removeListener(event, dataFunc);
+						userSocket.removeListener("disconnect", socketDisconnectHandler);
+						userSocket.removeListener("endstream", transferFinishFunc);
+						clearTimeout(timeoutID);
+					}
+		
+					//If no data has been received within 5 seconds of the server waiting for said data's receipt, reject this promise
+					let timeoutID = setTimeout(function() {
+						if (!hasActivityOccurred) {
+							removeListeners();
+							res({code: "socketTimeout", message: "Error (Socket timeout): waiting period of 5000ms has been surpassed"});
+						}
+					}, delay);
+					//Handle received quiz question data accordingly, by resolving the promise with it
+					userSocket.on("endstream", transferFinishFunc);
+					userSocket.on("disconnect", socketDisconnectHandler);
+					userSocket.on(event, dataFunc);
+				};
+			}
+			let data;
+			//Create the promise from now, to prevent future deadlocks. If the previously created promise resolves before the "await" clause, awaiting it will immediately return the value with which the promise has resolved
+			let p = new Promise(dataWaitPromiseFunc("quizQuestionStream"));
+	
+			res.writeHead(200, {"Content-Type":"text/plain"});
+			res.end();
+	
+			let abort = async function() {
+				questionsBeingSent = false;
+				socket.emit("streamwritefailed");
+				//Something went wrong: delete the NEW quiz data
+				await queryDB(`DELETE FROM quiz WHERE quizCode = ?`, [req.query.qc]);
+			}
+			//If the "endstream" event is emitted while not awaiting the resolution (or rejection) of a promise, this handler should update the necessary flags accordingly
+			let streamEndExit = async function() {
+				//userSocket.removeListener("endstream", streamEndExit);
+				questionsBeingSent = false;
+				//New quiz successfully transferred
+				//If the above if statement has not been executed, the error was thrown to exit the main loop following successful streaming completion. Nothing is wrong!
+				await queryDB(`UPDATE quiz
+				SET numQuestions = ?
+				WHERE quizCode = ?`, [questionNum, quizCode]);
+				//No need to increment questionNum, it would have already been incremented at the end of the last iteration (that before the one which invoked this function)
+			}
+			//userSocket.on("endstream", streamEndExit);
+			//Successfully wrote quiz metadata to server. Now, we must stream the questions one by one
+			try {
+				//Delete all of the old quiz questions from the DB here, since there would be little to stop the receipt of questions and one must assume that the old questions have been deleted
+				while (questionsBeingSent) {
+					//Create promise before sending data to prevent race conditions
+					//The server will NOT ping the client, but the other way round. If the server receives a message, it will attempt to respond
+					if (questionNum !== 0) {
+						//The promise for the first question has already been set
+						p = new Promise(dataWaitPromiseFunc("quizQuestionStream", 5000 * 10));
+						//Refers to the previous question
+						userSocket.emit("streamwritecompleted");
+					}
+					//On the first receipt attempt of the first question, the signal would have been sent by the http response
+					data = await p;
+					if (typeof data === "object") {
+						if (data.code === "streamComplete") {
+							//Stream complete! Break out of the loop
+							await streamEndExit();
+							break;
+						} else if (data.code !== "socketTimeout") {
+							//Question not duly received; abort and exit method
+							await abort();
+							return;
+						}
+					}
+					//Question successfully received; continue
+					//Promise would have been resolved by now; this would yield a value virtually instantly
+					sentData = JSON.parse(data);
+					for (let i = 0; i < sentData.options.length; i++) {
+						sentData.options[i] = sanitiseUserInputForHTML(sentData.options[i]);
+					}
+					for (let i = 0; i < sentData.answers.length; i++) {
+						sentData.answers[i] = sanitiseUserInputForHTML(sentData.answers[i]);
+					}
+					//Store newly-received question in DB
+					await queryDB(`INSERT INTO question (quizCode, questionNumber, questionHTMLSanitised, questionType, optionsJSON, correctOptionsJSON, caseSensitive, correctAnswerMessageHTMLSanitised, incorrectAnswerMessageHTMLSanitised, timeLimit, messageDuration, maxpoints)
+					VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
+						quizCode,
+						questionNum,
+						sanitiseUserInputForHTML(sentData.question),
+						sentData.questionType,
+						JSON.stringify(sentData.options),
+						JSON.stringify(sentData.answers),
+						sentData.caseSensitive,
+						sanitiseUserInputForHTML(sentData.correctanswermessage),
+						sanitiseUserInputForHTML(sentData.incorrectanswermessage),
+						sentData.timelimit,
+						sentData.messageduration,
+						sentData.maxpointsperquestion
+					]);
+					//Increment question number, which is used to identify the question in the DB
+					questionNum++;
+				}
+			} catch (e) {
+				console.log(e);
+				//Something went wrong while streaming the questions
+				abort();
 				return;
 			}
 			userSocket.emit("quizfilestreamclose");
@@ -1682,6 +2289,335 @@ app.post("/sendnewquiz", async function(req, res) {
 	} else {
 		res.writeHead(403, {"Content-Type":"text/plain"});
 		res.end("You must be authenticated (logged in) to upload your own quiz");
+	}
+});
+
+//1l0v3+r:v!a
+app.put("/sendeditedquiz", async function(req, res) {
+	//Check whether session id is outdated BEFORE reading the maps
+	let cookies = getCookies(req);
+	await updateSessionID(cookies.sessionid);
+	let userEmail = sessionIDEmailMap.get(cookies.sessionid);
+	//The user is loaded in memory
+	if (userEmail != undefined) {
+		//Check quiz code lengths
+		if (typeof req.query.qc !== "string") {
+			res.writeHead(400, {"Content-Type":"text/plain"});
+			res.end("The \"qc\" parameter must be specified in the query string to determine the old quiz's code");
+		} else if (typeof req.body.qc !== "string") {
+			res.writeHead(400, {"Content-Type":"text/plain"});
+			res.end("The \"qc\" field in the JSON payload must be specified to determine the new quiz's code");
+		}
+		if (req.query.qc.length > 20) {
+			//Quiz code must be at most 20 characters long! This prevents error-throwing (and consequently server-crashing) attempts at entering duplicate quiz codes (Primary Key) within the DB due to trimmed quiz lengths bypassing server-side validation
+			res.writeHead(400, {"Content-Type":"text/plain"});
+			res.end("The old quiz's code must be at most 20 characters long");
+			return;
+			//Short-circuiting 'AND' statement to prevent the second expression from being evaluated in the case of the first one yielding false, which prevents the possibility of accessing properties of undefined
+		} else if (req.body.qc.length > 20) {
+			//Quiz code must be at most 20 characters long! This prevents error-throwing and consequently server-crashing attempts at entering duplicate quiz codes (Primary Key) within the DB due to trimmed quiz lengths bypassing server-side validation
+			res.writeHead(400, {"Content-Type":"text/plain"});
+			res.end("The quiz's new code must be at most 20 characters long");
+			return;
+		}
+		//Check if the specified quiz code already exists.
+		//NOTE: req.query.qc here specifies the code of the OLD quiz, not the new one.
+		let equivalentQuizzes = await queryDB(`SELECT userID, dateCreated FROM quiz WHERE quizCode = ?`, [req.query.qc]);
+		if (equivalentQuizzes.length === 0) {
+			//Quiz does not exist
+			res.writeHead(409, {"Content-Type":"text/plain"});
+			res.end("The specified quiz code does not exist. Please choose another.");
+			return;
+		} else if (equivalentQuizzes.length > 1) {
+			//Catastrophe: More than one quiz shares the same code - throw fatal server-side error
+			res.writeHead(500, {"Content-Type":"text/plain"});
+			res.end("Catastrophic server-side error: Multiple quizzes of the same code exist. Server crashing...");
+			throw new CatastrophicError("Catastrophic server-side error: Multiple quizzes of the same code exist. Server crashing...");
+		}
+
+		//Check if the user owns the quiz
+		if (equivalentQuizzes[0].userID !== emailDBRecordMap.get(userEmail)) {
+			//This user is not the quiz's creator and hence is not allowed to modify it
+			res.writeHead(403, {"Content-Type": "text/html"});
+			res.end("You do not own this quiz and hence cannot edit it");
+			return;
+		}
+		let quizCreationDate = equivalentQuizzes[0].dateCreated;
+
+		let quizCodeUnchanged = false;
+		//A temporary, unique alias for the new quiz as data is sent to the server
+		let newTempQuizCode;
+		if (req.body.qc === req.query.qc) {
+			quizCodeUnchanged = true;
+			do {
+				newTempQuizCode = createUUID().slice(0, 20);
+				equivalentQuizzes = (await queryDB(`SELECT COUNT(quizID) FROM quiz WHERE quizCode = ?`, [newTempQuizCode]))[0]["COUNT(quizID)"];
+			} while (equivalentQuizzes > 0);
+			req.body.qc = newTempQuizCode;
+		}
+		//Quiz already exists - good. Attempt to check whether or not the new quiz code exists and whether the old quiz is owned by this particular user
+		equivalentQuizzes = await queryDB(`SELECT userID FROM quiz WHERE quizCode = ?`, [req.body.qc]);
+		if (equivalentQuizzes.length === 1 && !quizCodeUnchanged) {
+			//Quiz does not exist
+			res.writeHead(409, {"Content-Type":"text/plain"});
+			res.end("The new quiz code has been taken. Please choose another.");
+			return;
+		} else if (equivalentQuizzes.length > 1) {
+			//Catastrophe: More than one quiz shares the same code - throw fatal server-side error
+			res.writeHead(500, {"Content-Type":"text/plain"});
+			res.end("Catastrophic server-side error: Multiple quizzes of the same code exist. Server crashing...");
+			throw new CatastrophicError("Catastrophic server-side error: Multiple quizzes of the same code exist. Server crashing...");
+		}
+		//If the user has no db record in memory, load it now
+		if (emailDBRecordMap.get(userEmail) == undefined) {
+			let userDBID = await queryDB(`SELECT userID FROM user WHERE emailAddress = ?`, [userEmail]);
+			if (userDBID.length < 1) {
+				//The user does not exist, but this was retrieved server-side, so something is horribly wrong. Return error code and stop method execution.
+				res.writeHead(500, {"Content-Type":"text/plain"});
+				res.end("Something went wrong server-side! Very probably not your fault");
+				return;
+			} else if (userDBID.length > 1) {
+				//Something is terribly, terribly wrong (multiple users with the same email address). Throw a fatal server-side error
+				res.writeHead(500, {"Content-Type":"text/plain"});
+				res.end("Multiple users have the same email address (inside DB)");
+				throw new CatastrophicError("Multiple users have the same email address (inside DB)");
+				//No need for return; the error stops execution of this function and propagates up the call stack
+			}
+			emailDBRecordMap.set(userEmail, userDBID[0].userID);
+		}
+
+		//Cast a number of attributes from boolean to number with bounds checking (true -> 1, false -> 0)
+		let attrsToNum = ["bgmusic", "dotimelimit", "answerbuzzers", "showgrade", "showgradecomment", "sendAnswers", "showcorrectanswers", "showpoints", "privatequiz"];
+		for (let attribute of attrsToNum) {
+			req.body[attribute] = Number(req.body[attribute]);
+			if (req.body[attribute] !== 1 && req.body[attribute] !== 0) {
+				req.body[attribute] = 0;
+			}
+		}
+		//Check for null on flags determining the presence of a particular quiz feature (e.g.: music) and nullify the field which would typically store the resource URI
+		if (!req.body.bgmusic) {
+			req.body.bgmusicsrc = null;
+		}
+
+		//req.body.showgradecomment cannot be 1 (true) if req.body.showgrade is 0 (false)
+		req.body.showgradecomment = req.body.showgrade & req.body.showgradecomment;
+
+		//Enforce data consistency: data is logical and consistent (follows rules and standards). No need to involve req.body.showgrade as req.body.showgradecomment has already been set to false if showgrade were false.
+		if (!req.body.showgradecomment || !(req.body.resulthtmlcommentranges instanceof Array)) {
+			//Very simple optimisation to reduce space allocation: Destroy grade comment data in the case of it not being needed
+			req.body.resulthtmlcommentranges = [];
+		}
+		if (!req.body.privatequiz || !(req.body.allowedparticipants instanceof Array)) {
+			req.body.allowedparticipants = [];
+		}
+		//The DB record has already been loaded in memory through this operation being done earlier in the method
+		/*if (emailDBRecordMap.get(userEmail) == undefined) {
+			let userDBID = await queryDB(`SELECT userID FROM user WHERE emailAddress = ?`, [userEmail]);
+			if (userDBID.length < 1) {
+				//The user does not exist, but this was retrieved server-side, so something is horribly wrong. Return error code and stop method execution.
+				res.writeHead(500, {"Content-Type":"text/plain"});
+				res.end("Something went wrong server-side! Very probably not your fault");
+				return;
+			} else if (userDBID.length > 1) {
+				//Something is terribly, terribly wrong (multiple users with the same email address). Throw a fatal server-side error
+				res.writeHead(500, {"Content-Type":"text/plain"});
+				res.end("Multiple users have the same email address (inside DB)");
+				throw new CatastrophicError("Multiple users have the same email address (inside DB)");
+				//No need for return; the error stops execution of this function and propagates up the stack
+			}
+			emailDBRecordMap.set(userEmail, userDBID[0].userID);
+		}*/
+		//Ensure that input is ALWAYS 1 or 0
+		//DO NOT update the existing quiz; create a quiz whose code is that of the new one, insert its questions and delete the old quiz AFTER the new one has been inserted
+		/*Old update SQL statement: `UPDATE quiz 
+		SET quizCode = ?, userID = ?, quizTitle = ?, backgroundMusicSrc = ?, doTimeLimit = ?, doAnswerBuzzers = ?, correctAnswerBuzzerSrc = ?, incorrectAnswerBuzzerSrc = ?, showGrade = ?, showGradeComment = ?, resultHTMLCommentRangesJSON = ?, sendAnswers = ?, answersRecipient = ?, showCorrectAnswers = ?, showPoints = ?, ageRestriction = ?, privateQuiz = ?, allowedParticipantsListJSON = ?
+		WHERE quizCode = ?`*/
+		let quiz = await queryDB(`INSERT INTO quiz (quizCode, userID, quizTitle, backgroundMusicSrc, doTimeLimit, doAnswerBuzzers, correctAnswerBuzzerSrc, incorrectAnswerBuzzerSrc, showGrade, showGradeComment, resultHTMLCommentRangesJSON, sendAnswers, answersRecipient, showCorrectAnswers, showPoints, ageRestriction, privateQuiz, allowedParticipantsListJSON, dateCreated)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		[
+			req.body.qc,
+			emailDBRecordMap.get(userEmail),
+			req.body.quiztitle,
+			req.body.bgmusicsrc,
+			req.body.dotimelimit,
+			req.body.answerbuzzers,
+			req.body.correctanswerbuzzersrc,
+			req.body.incorrectanswerbuzzersrc,
+			req.body.showgrade,
+			req.body.showgradecomment,
+			JSON.stringify(req.body.resulthtmlcommentranges),
+			req.body.sendAnswers,
+			req.body.answersrecipient,
+			req.body.showcorrectanswers,
+			req.body.showpoints,
+			Number(req.body.agerestriction),
+			req.body.privatequiz,
+			JSON.stringify(req.body.allowedparticipants),
+			quizCreationDate/*,
+			toSQLDateTime(new Date())*/
+			/*THIS ENTRY MUST ALWAYS BE THE FINAL ONE, FOR IT IS FOR THE 'WHERE' CLAUSE*/
+			/*,req.query.qc*/
+		]);
+
+		//Initialise socket prior to event firing to prevent deadlocks
+		let questionNum = 0;
+		//Use the new quiz code
+		let quizCode = req.body.qc;
+		let questionsBeingSent = true;
+		let userSocket = connectedSocketsMap.get(emailSocketIDMap.get(userEmail));
+		if (userSocket == undefined) {
+			console.log(cookies, emailSocketIDMap, connectedSocketsMap);
+			res.writeHead(500, {"Content-Type":"text/plain"});
+			res.end("Something went wrong on the server-side! Please refresh the page and try again.");
+			return;
+		}
+		let sentData;
+		//Function to wait for incoming data and automatically reject within 5 seconds if no data is provided or the client disconnects
+		let dataWaitPromiseFunc = function(event, delay = 5000) {
+			return function(res, rej) {
+				let hasActivityOccurred = false;
+				let dataFunc = function(data) {
+					//Prevent the promise from being rejected in the future
+					hasActivityOccurred = true;
+					removeListeners();
+					res(data);
+				}
+				//To be executed when the quiz transmission finishes
+				let transferFinishFunc = function() {
+					hasActivityOccurred = true;
+					questionsBeingSent = false;
+					removeListeners();
+					res({code: "streamComplete", message: "Success: the transfer has been completed"});
+				}
+	
+				//To be invoked after socket "disconnect" event
+				let socketDisconnectHandler = function() {
+					removeListeners();
+					rej("Error: the socket has disconnected during the stream");
+				}
+	
+				//Function to remove socket listeners whenever about to resolve or reject promise
+				let removeListeners = function() {
+					userSocket.removeListener(event, dataFunc);
+					userSocket.removeListener("disconnect", socketDisconnectHandler);
+					userSocket.removeListener("endstream", transferFinishFunc);
+					clearTimeout(timeoutID);
+				}
+	
+				//If no data has been received within 5 seconds of the server waiting for said data's receipt, reject this promise
+				let timeoutID = setTimeout(function() {
+					if (!hasActivityOccurred) {
+						removeListeners();
+						res({code: "socketTimeout", message: "Error (Socket timeout): waiting period of 5000ms has been surpassed"});
+					}
+				}, delay);
+				//Handle received quiz question data accordingly, by resolving the promise with it
+				userSocket.on("endstream", transferFinishFunc);
+				userSocket.on("disconnect", socketDisconnectHandler);
+				userSocket.on(event, dataFunc);
+			};
+		}
+		let data;
+		//Create the promise from now, to prevent future deadlocks. If the previously created promise resolves before the "await" clause, awaiting it will immediately return the value with which the promise has resolved
+		let p = new Promise(dataWaitPromiseFunc("quizQuestionStream", 5000 * 10));
+
+		let abort = async function() {
+			questionsBeingSent = false;
+			userSocket.emit("streamwritefailed");
+			//Something went wrong: delete the NEW quiz data
+			await queryDB(`DELETE FROM quiz WHERE quizCode = ?`, [req.body.qc]);
+		}
+		//If the "endstream" event is emitted while not awaiting the resolution (or rejection) of a promise, this handler should update the necessary flags accordingly
+		let streamEndExit = async function() {
+			//userSocket.removeListener("endstream", streamEndExit);
+			questionsBeingSent = false;
+			//New quiz successfully transferred: delete the OLD quiz data
+			await queryDB(`DELETE FROM quiz WHERE quizCode = ?`, [req.query.qc]);
+			//If the above if statement has not been executed, the error was thrown to exit the main loop following successful streaming completion. Nothing is wrong!
+			await queryDB(`UPDATE quiz
+			SET numQuestions = ?
+			WHERE quizCode = ?`, [questionNum, quizCode]);
+			//No need to increment questionNum, it would have already been incremented at the end of the last iteration (that before the one which invoked this function)
+			if (quizCodeUnchanged) {
+				//Change the alias
+				await queryDB(`UPDATE quiz
+				SET quizCode = ?
+				WHERE quizCode = ?`, [
+					req.query.qc,
+					req.body.qc
+				]);
+			}
+		}
+
+		res.writeHead(200, {"Content-Type":"text/plain"});
+		res.end();
+
+		//userSocket.on("endstream", streamEndExit);
+		//Successfully wrote quiz metadata to server. Now, the questions must be streamed to the server one by one
+		try {
+			//Delete all of the old quiz questions from the DB here, since there would be little to stop the receipt of questions and one must assume that the old questions have been deleted
+			while (questionsBeingSent) {
+				//Create promise before sending data to prevent race conditions
+				//The server will NOT ping the client, but the other way round. If the server receives a message, it will attempt to respond. If said message is not received by the client within a given timespan, the client will attempt to resend the data to the server
+				if (questionNum !== 0) {
+					//The promise for the first question has already been set
+					p = new Promise(dataWaitPromiseFunc("quizQuestionStream", 5000 * 10));
+					//Refers to the previous question
+					userSocket.emit("streamwritecompleted");
+				}
+				data = await p;
+				//On the first receipt attempt of the first question, the signal would have been sent by the http response
+				if (typeof data === "object") {
+					if (data.code === "streamComplete") {
+						//Stream complete! Break out of the loop
+						await streamEndExit();
+						break;
+					} else if (data.code === "socketTimeout") {
+						//Question not duly received; abort and exit method
+						await abort();
+						return;
+					}
+				}
+				//Question successfully received; continue
+				//Promise would have been resolved by now; this would yield a value virtually instantly
+				sentData = JSON.parse(data);
+				for (let i = 0; i < sentData.options.length; i++) {
+					sentData.options[i] = sanitiseUserInputForHTML(sentData.options[i]);
+				}
+				for (let i = 0; i < sentData.answers.length; i++) {
+					sentData.answers[i] = sanitiseUserInputForHTML(sentData.answers[i]);
+				}
+				//Store newly-received question in DB
+				await queryDB(`INSERT INTO question (quizCode, questionNumber, questionHTMLSanitised, questionType, optionsJSON, correctOptionsJSON, caseSensitive, correctAnswerMessageHTMLSanitised, incorrectAnswerMessageHTMLSanitised, timeLimit, messageDuration, maxpoints)
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
+					quizCode,
+					questionNum,
+					sanitiseUserInputForHTML(sentData.question),
+					sentData.questionType,
+					JSON.stringify(sentData.options),
+					JSON.stringify(sentData.answers),
+					sentData.caseSensitive,
+					sanitiseUserInputForHTML(sentData.correctanswermessage),
+					sanitiseUserInputForHTML(sentData.incorrectanswermessage),
+					sentData.timelimit,
+					sentData.messageduration,
+					sentData.maxpointsperquestion
+				]);
+				//Increment question number, which is used to identify the question in the DB
+				questionNum++;
+			}
+		} catch (e) {
+			console.log(e);
+			//Something went wrong while streaming the questions
+			abort();
+			return;
+		}
+		//By now, the old quiz has been deleted by the streamEndExit() function
+		//await queryDB(`DELETE FROM quiz WHERE quizCode = ?`, [req.query.qc]);
+		userSocket.emit("quizfilestreamclose");
+	} else {
+		res.writeHead(403, {"Content-Type":"text/plain"});
+		res.end("You must be authenticated (logged in) to your account to modify your own quizzes");
 	}
 });
 
@@ -2399,7 +3335,7 @@ app.get("/fetchDetailedResponse", function(req, res) {
 	//Set the appropriate headers without finalising them (i.e.: in the case of error, they would be susceptible to change)
 	res.setHeader("Content-Type", "text/html");
 	res.status(200);
-	res.pipe(rs);
+	rs.pipe(res);
 	rs.on("end", function() {
 		res.end();
 		rs.destroy();
@@ -2419,6 +3355,7 @@ app.get("/fetchDetailedResponse", function(req, res) {
 
 //Faster and more efficient way to get the metadata of a quiz and its creator
 app.get("/getquizdata", async function(req, res) {
+	//TODO: Handle userID: NULL field when retrieving quiz creator's data, caused by account deletion
 	let quizDataObj = {};
 	let quizDataArr = await queryDB(`SELECT * FROM quiz WHERE quizCode = ?`, [req.query.qc]);
 	//ageRestriction, privateQuiz, allowedParticipantsListJSON, sendAnswers, answersRecipient, among others...
@@ -2464,9 +3401,9 @@ app.get("/getquizdata", async function(req, res) {
 				//No need for return; the error stops execution of this function and propagates up the stack
 			}
 			emailDBRecordMap.set(userEmail, userDBID[0].userID);
-		} else {
-			userDBID = emailDBRecordMap.get(userEmail);
 		}
+		//One can assume that data has been added to the map here
+		userDBID = emailDBRecordMap.get(userEmail);
 		if (quizDataObj.quizData.userID !== userDBID) {
 			//The user is logged in, but not to the quiz creator's account
 			res.writeHead(401, {"Content-Type":"text/plain"});
@@ -2474,10 +3411,6 @@ app.get("/getquizdata", async function(req, res) {
 			return;
 		}
 	}
-
-	//Do not mask these until AFTER the validation checks, for the validation checks would rely on the masks, yielding erroneous results
-	quizDataObj.quizData.quizID = undefined;
-	quizDataObj.quizData.userID = undefined;
 
 	//No need to validate user login to retrieve questions, since it has already been done. Should there be any violations, code byond this point would not be executed
 
@@ -2493,6 +3426,10 @@ app.get("/getquizdata", async function(req, res) {
 		//Mask the userID from the client
 		quizDataObj.creatorData.userID = undefined;
 	}
+
+	//Do not mask these until AFTER the validation checks and the retrieval operations, for the aforementioned operations would rely on the masks, yielding erroneous results
+	quizDataObj.quizData.quizID = undefined;
+	quizDataObj.quizData.userID = undefined;
 
 	if (Number(req.query.getquestions) === 1) {
 		//Wait for socket to send "ready" message
@@ -2592,6 +3529,7 @@ app.get("/getquizdata", async function(req, res) {
 	}
 });
 
+/**The metadata returned here is special; it also includes the current question*/
 app.post("/joinquiz", async function(req, res) {
 	//Check whether user can join quiz. If so, create a server-side quiz session which controls the questions sent to the client
 	let quizDataArr = await queryDB(`SELECT * FROM quiz WHERE quizCode = ?`, [req.query.qc]);
@@ -2638,11 +3576,13 @@ app.post("/joinquiz", async function(req, res) {
 		}
 		//Check if the quiz is private and handle data accordingly
 		try {
-			if (quizData.privateQuiz & JSON.parse(quizData.allowedParticipantsListJSON).indexOf(userEmail) === -1) {
-				//The quiz is private and the user's email is not within the list
-				res.writeHead(403, {"Content-Type":"text/plain"});
-				res.end("You cannot join this quiz for it is private and your email address has not been selected among the allowed quiz participants");
-				return;
+			if (quizData.privateQuiz) {
+				if (JSON.parse(quizData.allowedParticipantsListJSON).indexOf(userEmail) === -1) {
+					//The quiz is private and the user's email is not within the list
+					res.writeHead(403, {"Content-Type":"text/plain"});
+					res.end("You cannot join this quiz for it is private and your email address has not been selected among the allowed quiz participants");
+					return;
+				}
 			}
 		} catch (e) {
 			//Potential error when parsing JSON
@@ -2656,6 +3596,18 @@ app.post("/joinquiz", async function(req, res) {
 	//Join the quiz and make the appropriate server-side changes
 	//First, look for an existing quiz
 
+	//Function to save current quiz state and delete the session from the map in case of unexpected error or condition before termination IF AND ONLY IF the user is logged in
+	let saveProgress = async function(session) {
+		if (userEmail != undefined) {
+			//Centralised function involving saving quiz data to DB, in accordance with the DRY (Don't Repeat Yourself) proocedures
+			await saveQuizSession(session);
+			if (session === emailQuizSessionMap.get(userEmail)) {
+				//Prevent this from deleting the wrong quiz session: this would cause a catastrophe. Besides, map value access time complexity should be O(1) [Needs verification]
+				emailQuizSessionMap.delete(userEmail);
+			}
+		}
+	}
+
 	//Session checks: only save progress if user is logged in
 	let quizSession;
 	if (userEmail != undefined) {
@@ -2663,9 +3615,19 @@ app.post("/joinquiz", async function(req, res) {
 		if (existingSession.length === 1) {
 			//This session exists: retrieve it
 		//} else if (existingSession.length > 1) {
-			quizSession = QuizSession.fromObject(existingSession[0]);
+			/*existingSession[0].answersLogFileDir = existingSession[0].tempAnswersLogFileDir;
+			existingSession[0].questionOrder = JSON.parse(existingSession[0].questionsOrderJSON);*/
+			quizSession = QuizSession.fromObject({
+				quizCode: existingSession[0].quizCode,
+				emailAddress: existingSession[0].emailAddress,
+				quizQuestionIndex: existingSession[0].questionIndex,
+				questionOrder: JSON.parse(existingSession[0].questionsOrderJSON),
+				answersLogFileDir: existingSession[0].tempAnswersLogFileDir,
+				quizPoints: existingSession[0].quizPoints, //TODO: Cast this to a number
+				numCorrectAnswers: existingSession[0].numCorrectAnswers
+			});
 		} else {
-			quizSession = new QuizSession(req.query.qc, userEmail, 0, `${__dirname}/server_data/quiz_taker_answers_temp/${encodeURIComponent(userEmail).replace(/[*]/g, "%2A")},${encodeURIComponent(req.query.qc).replace(/[*]/g, "%2A")}.txt`);
+			quizSession = new QuizSession(req.query.qc, userEmail, 0, `${__dirname}/server_data/quiz_taker_answers_temp/${encodeURIComponent(userEmail).replace(/[*]/g, "%2A")},${encodeURIComponent(req.query.qc).replace(/[*]/g, "%2A")}.txt`, 0, 0, []);
 			//Generate an ordered list of indices, representing the order of questions to be asked, determined by by id	
 			for (let i = 0; i < quizData.numQuestions; i++) {
 				quizSession.questionOrder.push(i);
@@ -2674,8 +3636,8 @@ app.post("/joinquiz", async function(req, res) {
 			fisherYatesShuffle(quizSession.questionOrder);
 		}
 		let oldSession = emailQuizSessionMap.get(userEmail);
-		if (oldSession != undefined) {
-			//The user is currently taking part in another quiz. Unload the quiz session data from memory and place it in the DB for future access
+		if (oldSession != undefined && oldSession.quizCode !== req.query.qc) {
+			//The user is currently taking part in another quiz. Unload the quiz session data from memory and place it in the DB for future access IF IT IS NOT OF THE CURRENT QUIZ CODE
 			await saveProgress(oldSession);
 			/*await queryDB(`INSERT INTO quizsession (quizCode, emailAddress, questionIndex, questionsOrderJSON, tempAnswersLogFileDir)
 				VALUES (?, ?, ?, ?, ?)`, [oldSession.quizCode, oldSession.emailAddress, oldSession.quizQuestionIndex, JSON.stringify(oldSession.questionOrder), oldSession.answersLogFileDir]);*/
@@ -2689,7 +3651,7 @@ app.post("/joinquiz", async function(req, res) {
 		emailQuizSessionMap.set(userEmail, quizSession);
 	} else {
 		//This object is merely used for storing question order and send time when the user is not logged in; NO DATA IS SAVED IF THAT IS SO, FOR THERE WOULD BE NO WAY TO IDENTIFY THE LOGGED-OUT USER BEYOND THE SESSION
-		quizSession = new QuizSession(req.query.qc, undefined, 0, undefined);
+		quizSession = new QuizSession(req.query.qc, undefined, 0, undefined, 0, 0, []);
 		//Generate an ordered list of indices, representing the order of questions to be asked, determined by by id	
 		for (let i = 0; i < quizData.numQuestions; i++) {
 			quizSession.questionOrder.push(i);
@@ -2697,24 +3659,14 @@ app.post("/joinquiz", async function(req, res) {
 		//Shuffle the order of questions to prevent cheating and copying
 		fisherYatesShuffle(quizSession.questionOrder);
 	}
+	//Specify the current question index in the response
+	quizData.currentQuestionIndex = quizSession.quizQuestionIndex;
 	//Flag to signal the graceful termination of the quiz
 	let terminateQuiz = false;
 	quizSession.origTerminate = function() {
 		terminateQuiz = true;
 	}
 	quizSession.terminate = quizSession.origTerminate;
-
-	//Function to save current quiz state and delete the session from the map in case of unexpected error or condition before termination IF AND ONLY IF the user is logged in
-	let saveProgress = async function(session) {
-		if (userEmail != undefined) {
-			//Centralised function involving saving quiz data to DB, in accordance with the DRY (Don't Repeat Yourself) proocedures
-			await saveQuizSession(session);
-			if (session === emailQuizSessionMap.get(userEmail)) {
-				//Prevent this from deleting the wrong quiz session: this would cause a catastrophe. Besides, map value access time complexity should be O(1) [Needs verification]
-				emailQuizSessionMap.delete(userEmail);
-			}
-		}
-	}
 
 	//Wait for socket to send "ready" message
 	if (userEmail == undefined) {
@@ -2759,7 +3711,7 @@ app.post("/joinquiz", async function(req, res) {
 				clearTimeout(timeoutID);
 				userSocket.removeListener(eventName, successHandler);
 				userSocket.removeListener("disconnect", failureHandler);
-				//Reset to the original termination hander function, which should NEVER EVER BE CHANGED, EVER!!!
+				//Reset to the original termination handler function, the reference to which should NEVER EVER BE CHANGED, EVER!!!
 				quizSession.terminate = quizSession.origTerminate;
 			}
 			userSocket.on(eventName, successHandler);
@@ -2814,14 +3766,16 @@ app.post("/joinquiz", async function(req, res) {
 	try {
 		//Start from the last performed question. For newly-joined quizzes, this should always be zero. For saved quiz sessions, this can be any positive integer between zero and the number of questions in the quiz minus one
 		let pointsGained;
-		if (userEmail != undefined) {
+		let initQuizQuestionIndex = quizSession.quizQuestionIndex;
+		//Only do this for the FIRST question (relative to the whole quiz, not saved progress) and if the user is logged in
+		if (userEmail != undefined && initQuizQuestionIndex === 0) {
 			await writeToFileAsync("<div class = \"mainDiv\">");
 		}
 		for (i = quizSession.quizQuestionIndex; i < quizSession.questionOrder.length; i++) {
 			//If this were not so, the pointsGained value would be cached until the next correct answer
 			pointsGained = 0;
-			//Send a signal to the client to begin the countdown from 3
-			if (i === quizSession.quizQuestionIndex) {
+			//Send a signal to the client to begin the countdown from 3 at the first question
+			if (i === initQuizQuestionIndex) {
 				console.log("Performing countdown...");
 				latestPromise = new Promise(socketPromiseFunctionGenerator("countdownReady", 9000 /*9 seconds: 4-second countdown (3, 2, 1, GO!) plus 5-second headroom*/));
 				userSocket.emit("initiateCountdown");
@@ -2853,7 +3807,7 @@ app.post("/joinquiz", async function(req, res) {
 					case "responseTimeout":
 						//Response timed out! Assume that the client is not ready to start the quiz. Save and delete quiz sessions accordingly (done)
 						//TODO: Do something! Either kick the user and mark the question as undone (by not incrementing the question index) and not save it, to be redone on rejoining OR mark the answer incorrect by delivering a blank answer
-						//This code would only execute 5 seconds after the time limit. If clients running the quiz app as intended do not submit the answer on time, assuming timely data transmission, their answer would simply be marked wrong
+						//This code would only execute 5 seconds after the time limit. If clients running the quiz app as intended do not submit the answer on time, assuming timely data transmission, their answer would simply be marked wrong (for multiple-choice answers) or sent as-is (in the case of text answers)
 
 						
 
@@ -2861,8 +3815,10 @@ app.post("/joinquiz", async function(req, res) {
 					case "quizOverwritten":
 						//The user is attempting to join a quiz whilst already in one!
 						//Only save and delete progress from map if user is logged in (validation is performed inside function, for this must ALWAYS hold true)
+						//TODO: Check if progress is saved elsewhere (i.e.: before terminate() is invoked)
 						await saveProgress(quizSession);
 						//No need for the 'break' statement here. Returns from entire function scope.
+						//STOP QUIZ LOOP IMMEDIATELY for this particular client, to prevent inconsistent state and nightmarishly impossible (difficult to deal with -> (isolate, reproduce and patch)) bugs
 						return;
 				}
 			}
@@ -2893,13 +3849,13 @@ app.post("/joinquiz", async function(req, res) {
 				if (correctAnswersCaseCopy.indexOf(answerCaseCopy) === -1) {
 					//Incorrect answer
 					correct = false;
-					answerString = "incorrectly";
+					answerString = "<span class = \"incorrectAnswer\">incorrectly</span>";
 				} else {
 					//Correct answer
 					correct = true;
 					//Increment the number of correct answers
 					quizSession.numCorrectAnswers++;
-					answerString = "correctly";
+					answerString = "<span class = \"correctAnswer\">correctly</span>";
 				}
 				await writeToFileAsync(`<div class = "userAnswerCorrectness">Quiz taker has answered this question ${answerString}</div>`);
 				await writeToFileAsync(`<div class = "userAnswer">Quiz taker's answer: ${answer}</div>`);
@@ -2975,12 +3931,99 @@ app.post("/joinquiz", async function(req, res) {
 			}
 			//Send the client the correct answer(s), along with their points. If the quiz creator did not wish to show points, the variable will still be sent, but it will contain no useful information (value not used and therefore stuck at zero)
 			userSocket.emit("correctAnswer", JSON.stringify({correctAnswers, correct, showPoints: quizData.showPoints, points: quizSession.quizPoints, pointsGained}));
+			//At the end, increment the quiz question index
+			quizSession.quizQuestionIndex++;
 		}
 	} catch (e) {
 		//TODO; fix this
 		//Typically caused due to the client disconnecting
 		console.log(e);
 	}
+
+	let newFileID;
+	//Only do this if the quiz has finished, regardless of user state (i.e.: logged in or logged out)
+	if (i === quizSession.questionOrder.length) {
+		let resultantGrade = 0, gradeComment = "";
+		if (quizData.showGrade) {
+			//Do this here, not during grade incrementation
+			resultantGrade = quizSession.numCorrectAnswers;
+			//Only check this if showGrade is true
+			if (quizData.showGradeComment) {
+				//Get the array of comments and mark ranges
+				let gradeCommentRangesArr = JSON.parse(quizData.resultHTMLCommentRangesJSON);
+				for (let i = 0; i < gradeCommentRangesArr.length; i++) {
+					let range = gradeCommentRangesArr[i];
+					if (quizSession.numCorrectAnswers >= range.min && quizSession.numCorrectAnswers <= range.max) {
+						//This is the first comment whose mark bounds are satisfied by the quiz taker's mark! Stop at the first one found!
+						gradeComment = range.comment;
+						break;
+					}
+				}
+			}
+		}
+		//This does not belong in the next "if (userEmail != undefined)" block, since this has an "else" statement to define the newFileID variable in both cases, since it will be involved in the immediate quiz results
+		if (userEmail != undefined) {
+			do {
+				newFileID = createUUID();
+			} while (await new Promise(function(res, rej) {
+				fs.access(`${__dirname}/server_data/quiz_taker_answers_temp/${newFileID}.txt`, function(err) {
+					if (err) {
+						//File does not exist
+						res(false);
+					} else {
+						//File does exist
+						res(true);
+					}
+				});
+			}));
+			//Rename the file with a unique ID
+			var err = await new Promise(function(res, rej) {
+				fs.rename(quizSession.answersLogFileDir, `${__dirname}/server_data/quiz_taker_answers_temp/${newFileID}.txt`, function(err) {
+					if (err) {
+						res(err);
+					} else {
+						res();
+					}
+				});
+			});
+			if (err) {
+				console.log(err);
+				newFileID = undefined;
+			}
+		} else {
+			//No file, since user is not signed in
+			newFileID = "";
+		}
+		//Await the promise confirming client readiness AFTER sending the notification, for hacked clients may never request their results, delaying their receipt by the creator. (They would still be sent, eventually, due to the timeout)
+		await latestPromise;
+		let obj = {
+			points: quizSession.quizPoints,
+			grade: resultantGrade,
+			gradeComment,
+			questionAnswersID:newFileID,
+			isLoggedIn: userEmail != undefined
+			//If quiz creator did not wish to publicise the points, the value will be zero.
+		}
+		//Mask the correct answers from the user, not the quiz creator
+		if (!quizData.showCorrectAnswers) {
+			obj.questionAnswersID = "";
+		}
+		for (let i = 0; i < 10; i++) {
+			let successPromise = new Promise(socketPromiseFunctionGenerator("resultsReceived"), 5000);
+			userSocket.emit("quizResults", JSON.stringify(obj));
+			let data = await successPromise;
+			//variable "data" is not necessarily of type boolean, therefore "if (data)" would treat data as true unless its value were among a select set of falsy values such as 0, null, false and undefined
+			if (data === true) {
+				//Success; break!
+				break;
+			}
+		}
+		if (userEmail != undefined) {
+			//If applicable (i.e.: quiz has been completed), delete the quiz session stored in the db
+			await queryDB(`DELETE FROM quizsession WHERE quizCode = ? AND emailAddress = ?`, [req.query.qc, userEmail]);
+		}
+	}
+
 	//If the user were not logged in, the file stream could not have possibly been created
 	if (userEmail != undefined) {
 		//Save the user's quiz progress
@@ -3022,10 +4065,10 @@ app.post("/joinquiz", async function(req, res) {
 						pointsElem = `<span class = "paragraph">Points: ${quizSession.quizPoints}</span>`;
 					}
 					sendNotification("noreply@quizdom.com", answersRecipient, `Quiz Results from email address ${userEmail}`, `
-						<span class = "paragraph">${username},</span>
-						<span class = "paragraph">The user "${userEmail}" has submitted their response to your quiz titled ${quizData.quizTitle}. You can view the basic information below, or click 'More Details' for more comprehensive details on the quiz taker's performance</span>
+						<p>${username},</p>
+						<p>The user "${userEmail}" has submitted their response to your quiz titled "${quizData.quizTitle}". You can view the basic information below, or click 'More Details' for more comprehensive details on the quiz taker's performance</p>
 						<div class = "details">
-							<span class = "paragraph">Mark: ${quizSession.numCorrectAnswers}/${quizSession.questionOrder.length} (${Math.round((quizSession.numCorrectAnswers/quizSession.questionOrder.length)*100)/100}%)</span>
+							<p class = "paragraph">Mark: ${quizSession.numCorrectAnswers}/${quizSession.questionOrder.length} (${Math.round((quizSession.numCorrectAnswers/quizSession.questionOrder.length)*100)}%)</p>
 							${pointsElem}
 							<button class = "moreDetails" detailsID = "${newFileID}">More Details</button>
 						</div>
@@ -3121,84 +4164,7 @@ app.post("/joinquiz", async function(req, res) {
 		}
 	}
 
-	//Only do this if the quiz has finished, regardless of user state (i.e.: logged in or logged out)
-	if (i === quizSession.questionOrder.length) {
-		let resultantGrade = 0, gradeComment = "";
-		if (quizData.showGrade) {
-			//Do this here, not during grade incrementation
-			resultantGrade = quizSession.numCorrectAnswers;
-			//Only check this if showGrade is true
-			if (quizData.showGradeComment) {
-				//Get the array of comments and mark ranges
-				let gradeCommentRangesArr = JSON.parse(quizData.resultHTMLCommentRangesJSON);
-				for (let i = 0; i < gradeCommentRangesArr.length; i++) {
-					let range = gradeCommentRangesArr[i];
-					if (quizSession.numCorrectAnswers >= range.min && quizSession.numCorrectAnswers <= range.max) {
-						//This is the first comment whose mark bounds are satisfied by the quiz taker's mark! Stop at the first one found!
-						gradeComment = range.comment;
-						break;
-					}
-				}
-			}
-		}
-		let newFileID;
-		if (userEmail != undefined) {
-			do {
-				newFileID = createUUID();
-			} while (await new Promise(function(res, rej) {
-				fs.access(`${__dirname}/server_data/quiz_taker_answers_temp/${newFileID}.txt`, function(err) {
-					if (err) {
-						//File does not exist
-						res(false);
-					} else {
-						//File does exist
-						res(true);
-					}
-				});
-			}));
-			//Rename the file with a unique ID
-			await new Promise(function(res, rej) {
-				fs.rename(quizSession.answersLogFileDir, `${__dirname}/server_data/quiz_taker_answers_temp/${newFileID}.txt`, function(err) {
-					if (err) {
-						rej(err);
-					} else {
-						res();
-					}
-				});
-			});
-		} else {
-			//No file, since user is not signed in
-			newFileID = "";
-		}
-		//Await the promise confirming client readiness AFTER sending the notification, for hacked clients may never request their results, delaying their receipt by the creator. (They would still be sent, eventually, due to the timeout)
-		await latestPromise;
-		let obj = {
-			points: quizSession.quizPoints,
-			grade: resultantGrade,
-			gradeComment,
-			questionAnswersID:newFileID,
-			isLoggedIn: userEmail != undefined
-			//If quiz creator did not wish to publicise the points, the value will be zero.
-		}
-		//Mask the correct answers from the user, not the quiz creator
-		if (!quizData.showCorrectAnswers) {
-			obj.questionAnswersID = "";
-		}
-		for (let i = 0; i < 10; i++) {
-			let successPromise = new Promise(socketPromiseFunctionGenerator("resultsReceived"), 5000);
-			userSocket.emit("quizResults", JSON.stringify(obj));
-			let data = await successPromise;
-			//Data is not necessarily of type boolean, therefore "if (data)" would treat data as true unless its value were among a select set of falsy values such as 0, null, false and undefined
-			if (data === true) {
-				//Success; break!
-				break;
-			}
-		}
-		if (userEmail != undefined) {
-			//If applicable (i.e.: quiz has been completed), delete the quiz session stored in the db
-			await queryDB(`DELETE FROM quizsession WHERE quizCode = ? AND emailAddress = ?`, [req.query.qc, userEmail]);
-		}
-	}
+	//POINT
 });
 
 //Next question to be obtained through socket.io

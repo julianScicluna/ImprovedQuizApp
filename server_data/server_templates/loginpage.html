@@ -4,17 +4,77 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
 		<script src="/socket.io/socket.io.js"></script>
 		<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-gH2yIJqKdNHPEq0n4Mqa/HGKIhSkIHeL5AyhkYV8i59U5AR6csBvApHHNl/vI1Bx" crossorigin="anonymous">
+		<link rel = "stylesheet" href="/server_data/server_pages/globalStyles.css"></link>
 		<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-A3rJD856KowSb7dwlZdYEkO39Gagi7vIsF0jrRAoQmDKKtQBHUuLZ9AsSv4jD4Xa" crossorigin="anonymous"></script>
 		<script language = "javascript">
+			const invalidEmailChars = ["&", " ", "(", ")", ",", ":", ";", "<", ">", "@", "[", "\\", "]"]
+			function isEmailValid(emailStr) {
+				if (emailStr.length > 320) {
+					return {valid: false, reason: "Email too long."};
+				}
+				if (emailStr[0] === "." || emailStr[emailStr.length - 1] === ".") {
+					return {valid: false, reason: "Email address cannot start or end with a fullstop."};
+				}
+				let atChar = false;
+				for (let i = 0; i < emailStr.length; i++) {
+					if (emailStr[i] === "@") {
+						if (atChar) {
+							//quiz_background_soundtrack
+							return {valid: false, reason: "At-character already used"};
+						} else {
+							atChar = true;
+						}
+					}
+					if (invalidEmailChars.indexOf(emailStr[i]) !== -1) {
+						//Invalid character!
+						return {valid: false, reason: "The email cannot contain any invalid characters: " + invalidEmailChars.join(", ")};
+					}
+				}
+				return {valid: true, reason: ""};
+			}
 			console.log('%c Stop! %c This console is for developers ONLY!!! DO NOT execute JavaScript on this console provided to you by ANYBODY unless you know exactly what you are doing and what the code snippet does! People can use this to steal your sensitive information. This is known as Self-XSS!', 'font-size: 36px; font-weight: bold; font-family:Arial; color:red; text-shadow: #000 1px 1px;', 'font-size:15px; font-family:Arial; color:#00FFFF;');
+			document.addEventListener("DOMContentLoaded", function(e) {
+				//TODO: Add client-side validation to prevent bad UX due to people unintentionally omitting fields
+				document.getElementById("login").addEventListener("click", function(e) {
+					let emailAddr = document.getElementById("email");
+					let password = document.getElementById("password");
+					let elems = [emailAddr, password];
+					let allFieldsFilledIn = true;
+
+					//Remove all of the classes BEFORE the forced reflow (layout thrash) and other loop, to register a change in class and retrigger the animation
+					for (var elem of elems) {
+						elem.parentElement.classList.remove("invalidFieldEntry");
+					}
+
+					//Force reflow (this is a getter and setter method in disguise; invoke Object.getOwnPropertyDescriptor(document.body, "offsetHeight") for more information)
+					document.body.offsetHeight;
+
+					//Check if either field is empty and add classes accordingly
+					for (var elem of elems) {
+						if (elem.value === "") {
+							elem.parentElement.style.setProperty("--field-error-value", "'This field is mandatory'");
+							elem.parentElement.classList.add("invalidFieldEntry");
+							allFieldsFilledIn = false;
+						}
+					}
+					if (allFieldsFilledIn) {
+						login(
+							emailAddr.value,
+							password.value,
+							socket.id
+						);
+					}
+				});
+			}, {once: true});
 			const socket = io();
-    			async function login(email, pwd, socketid) {
-        			var xhr = new XMLHttpRequest();
-        			xhr.open("POST", location.origin + "/login");
-        			xhr.setRequestHeader("Content-Type", "application/json");
-        			xhr.responseType = "text";
-        			xhr.send(JSON.stringify({email:email, password:pwd, socketid:socketid}))
-        			await new Promise(function(res, rej) {
+			async function login(email, pwd, socketid) {
+				var xhr = new XMLHttpRequest();
+				xhr.open("POST", location.origin + "/login");
+				xhr.setRequestHeader("Content-Type", "application/json");
+				xhr.responseType = "text";
+				xhr.send(JSON.stringify({email:email, password:pwd, socketid:socketid}))
+				try {
+					await new Promise(function(res, rej) {
 						xhr.onload = function() {
 							if (xhr.status === 200) {
 								res();
@@ -23,12 +83,13 @@
 							}
 						}
 						xhr.onerror = rej;
-					}).catch(function() {
-						alert(xhr.response);
-						throw "LoginError: " + xhr.response;
 					});
 					window.location.href = location.origin;
-    			}
+				} catch (e) {
+					alert(xhr.response);
+					throw "LoginError: " + xhr.response;
+				}
+			}
 		</script>
 	</head>
 	<body>
@@ -61,7 +122,7 @@
                                					</div>
 	                            			</div>
         	                    			<div class="text-center">
-                	                			<a href="#" class="btn btn-primary" onclick = "login(document.getElementById('email').value, document.getElementById('password').value, socket.id)" style="color:#00FF00; background-color:#0000FF; font-family:Consolas; font-size:30px;">Log in!</a>
+                	                			<a href="#" class="btn btn-primary animatedButton" id = "login">Log in!</a>
                         	    			</div>
                         			</div>
                     			</div>

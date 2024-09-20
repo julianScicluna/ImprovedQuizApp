@@ -3,6 +3,7 @@
 		<title>Quizdom!</title>
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
 		<link rel = "stylesheet" href="/server_data/server_pages/globalStyles.css"></link>
+		<link rel = "stylesheet" href="/server_data/server_pages/detailedAnswerDisplays.css"></link>
 		<script src="/socket.io/socket.io.js"></script>
 		<script src = "/server_data/server_pages/modal/modal.js"></script>
 		<script type="text/javascript">
@@ -99,10 +100,10 @@
 		<script src = "/server_data/server_pages/quizappauthenticationscript.js"></script>
 	</head>
 	<body>
-		<div id = "notificationsbgdiv" style = "display:none;">
+		<div id = "notificationsbgdiv" class = "hidden">
 			<div id="notificationsdiv">
-				<span onmouseover="this.style.color = '#FFFFFF'; this.style.backgroundColor = '#FF0000'" onmouseout="this.style.color = '#000000'; this.style.backgroundColor = 'rgba(0, 0, 0, 0)'" onclick="this.parentElement.parentElement.style.display = 'none'" style="float: right; color: rgb(0, 0, 0); background-color: rgba(0, 0, 0, 0);">&times;</span>
-				<div onscroll = "if (Math.abs(this.clientHeight - this.scrollHeight) === this.scrollTop) {getandshowNotifications(notifications.loaded /*Leave this value positive, for it would be turned negative INSIDE THE QUERY PARAMETER*/, /*this.getElementsByClassName('notification').length*/ 20, this)}" style="height:100px; width:100px; padding: 17px; max-width:95%; width:95%; max-height:50%; height:50%; overflow-x:auto; overflow-y:auto;">
+				<span class = "closebutton" onclick="this.parentElement.parentElement.classList.add('hidden')">&times;</span>
+				<div onscroll = "if (Math.abs(this.clientHeight - this.scrollHeight) === this.scrollTop) {getandshowNotifications(notifications.loaded /*Leave this value positive, for it would be turned negative INSIDE THE QUERY PARAMETER*/, /*this.getElementsByClassName('notification').length*/ 20, this)}" id = "notificationsScrollDiv">
 					
 				</div>
 			</div>

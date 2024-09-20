@@ -16,7 +16,7 @@ const addQuizDiv = function(parentElem = document.body, quizData, appendEntryBef
 				//TODO: Look into this
 				qc.value = decodeURIComponent(quizdescriptor.classList[0]);
 				//Object.freeze(quizcode);
-				window.location.href = `/editquiz?qc=${quizData.quizCode}&getquestions=1`;
+				window.location.href = `/editquiz?qc=${encodeURIComponent(quizData.quizCode)}&getquestions=1`;
 				//editquiz(decodeURIComponent(quizdescriptor.classList[0]));
 			}
 		},
@@ -260,6 +260,7 @@ async function viewQuizzes(elem = document.body) {
 		} while (frame.scrollHeight < frame.clientHeight);
 	} else {
 		alert("You need to be signed in to your account to view your quizzes!");
+		window.location.href = window.location.origin;
 	}
 }
 
@@ -400,31 +401,88 @@ async function viewQuizzes(elem = document.body) {
 }*/
 
 async function deletequiz(qc) {
-	var c = confirm("Are you sure you want to delete this quiz? It is completely unrecoverable and will be lost FOREVER!!!");
-	if (c) {
-		var xhr = new XMLHttpRequest();
-		xhr.open("POST", location.origin + "/deletequiz?qc=" + encodeURIComponent(qc));
-		xhr.responseType = "json";
-		xhr.send();
-		await new Promise(function(res, rej) {
-			xhr.onload = res;
-			xhr.onerror = rej;
-		}).then(function() {
-			if (xhr.status === 200) {
-				document.getElementById("quizzesframe").getElementsByClassName(encodeURIComponent(qc))[0].remove();
-				alert("Quiz successfully deleted");
-			} else {
-				throw "Uncaught XHRError: XMLHttpRequest Failed (Status code " + xhr.status + ")";
-			}
-		}).catch(function() {
-			if (xhr.response != null) {
-				alert(xhr.response.error);
-			} else {
-				alert("Failed to delete quiz. (Error code: " + xhr.status + ")")
-			}
-			throw "XHRError: Failed to delete quiz. XHR status: " + xhr.status;
+	let pwd;
+	if (typeof modal === "function") {
+		let m = new modal(document.body, `Delete quiz of code "${qc}" - confirmation`);
+		let content = parser.parseFromString(`
+			<div>This is a protected action. For security reasons, the account's password is required. Please enter it below</div>
+			<div><input type = "password" class = "password"></div>
+			<div><button type = "button" class = "modalsubmissionbutton submitpassword">OK</button><button type = "button" class = "modalsubmissionbutton abortpasswordsubmission">Cancel</button></div>
+		`, "text/html").body;
+		content = document.adoptNode(content);
+		let p = new Promise(function(res, rej) {
+			let submitted = false;
+			let password = content.getElementsByClassName("password")[0];
+			content.getElementsByClassName("submitpassword")[0].addEventListener("click", function(e) {
+				if (!submitted) {
+					submitted = true;
+					if (password.value === "") {
+						password.parentElement.style.setProperty("--field-error-value", "'This field cannot be empty'");
+						password.parentElement.classList.remove("invalidFieldEntry");
+						//Trigger reflow
+						document.body.offsetHeight;
+						password.parentElement.classList.add("invalidFieldEntry");
+						return;
+					}
+					res(password.value);
+					m.destroy();
+				}
+			});
+			content.getElementsByClassName("abortpasswordsubmission")[0].addEventListener("click", function(e) {
+				if (!submitted) {
+					submitted = true;
+					res(null);
+					m.destroy();
+				}
+			});
+			let oldHandler = m.getCloseHandler();
+			m.setCloseHandler(function() {
+				if (!submitted) {
+					submitted = true;
+					res(null);
+				}
+				oldHandler();
+			});
 		});
+		m.getModalBody().append(...content.childNodes);
+		m.show();
+		pwd = await p;
+	} else {
+		pwd = prompt("You are attempting to delete the quiz, which is a protected action. For security reasons, the account's password is required. Please enter it below");
 	}
+	console.log(pwd)
+	//User action aborted; exit
+	if (pwd == null) {
+		return;
+	}
+	
+	var xhr = new XMLHttpRequest();
+	xhr.open("DELETE", `${location.origin}/deletequiz?qc=${encodeURIComponent(qc)}&pwd=${encodeURIComponent(pwd)}`);
+	xhr.send();
+	await new Promise(function(res, rej) {
+		xhr.onload = function() {
+			if (xhr.status === 200) {
+				res();
+			} else {
+				rej();
+			}
+		};
+		xhr.onerror = rej;
+	}).then(function() {
+		if (xhr.status === 200) {
+			document.getElementById("quizzesframe").getElementsByClassName(encodeURIComponent(qc))[0].remove();
+			alert("Quiz successfully deleted");
+		} else {
+			throw new Error("Uncaught XHRError: XMLHttpRequest Failed (Status code " + xhr.status + ")");
+		}
+	}).catch(function() {
+		if (xhr.response != null) {
+			alert(xhr.response);
+		} else {
+			alert("Failed to delete quiz. (Error code: " + xhr.status + ")")
+		}
+		throw new Error("XHRError: Failed to delete quiz. XHR status: " + xhr.status + ". Error message: \"" + xhr.response + "\"");
+	});
 }
 async function savechanges(newquizJSON, quizcode) {
 	quizcode = encodeURIComponent(quizcode);

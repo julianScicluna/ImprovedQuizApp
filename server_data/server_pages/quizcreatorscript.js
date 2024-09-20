@@ -1,11 +1,17 @@
 ﻿var newgraderangehtmlstring = `<fieldset class = "gradeRange">
 	<legend>Grade range</legend>
-	<span>Minimum Grade</span>
-	<input type = "number" class = "rangecomponent mingrade"></input>
-	<button style = "float:right; background-color:white; color:black;" onclick = "this.parentElement.remove()" onmouseover = "this.style.color = 'white'; this.style.backgroundColor = 'red'" onmouseout = "this.style.color = 'black'; this.style.backgroundColor = 'white'" class = "rangecomponent">&times;</button><br />
-	<span>Maximum Grade</span>
-	<input type = "number" class = "rangecomponent maxgrade"></input>
-	<div style = "border:solid 1px black;" class = "editablerangecomponent gradecomment" contenteditable>Enter your comment here:</div>
+	<div class = "horizontallySeparatedContent">
+		<span>
+			<span>Minimum Grade</span>
+			<input type = "number" class = "rangecomponent mingrade"></input>
+		</span>
+		<button type = "button" class = "closebutton rangecomponent" onclick = "this.parentElement.remove()">&times;</button><br />
+	</div>
+	<div>
+		<span>Maximum Grade</span>
+		<input type = "number" class = "rangecomponent maxgrade"></input>
+	</div>
+	<div style = "border:solid 1px black;" class = "editablerangecomponent gradecomment content" contenteditable></div>
 </fieldset>`;
 var newoptionhtmlstring = `<button class="option">
 	<div>
@@ -19,7 +25,7 @@ var newquestionhtmlstring = `<fieldset class="questionbit" style="display:inline
 	<span class = "deletequestion closebutton">&times;</span>
 	<input type="text" class="questionliteral" placeholder="Enter the question here">
 	<div style="border:solid 1px black;">
-		<p style="display:inline;">Question type:</p>
+		<span>Question type:</span>
 		<select class="questiontype">
 			<option value="multichoice">Multi-Choice Question</option>
 			<option value="textchoice">Text Question</option>
@@ -69,6 +75,62 @@ const listenerNamespace = {
 	nextDOMLoadFuncs: []
 };
 
+const whiteSpaceRemover = {
+	whiteSpaceChars: ["\n", "\t", " ", "\r", "\f", "\v", "\u00A0", "\u2002", "\u2003", "\u2009", "\u200B", "\u200C", "\u200D", "\u3000"],
+	removeLeadingTrailingWhiteSpace(str) {
+		let startIndex = 0;
+		let endIndex = str.length;
+		while (this.whiteSpaceChars.indexOf(str[startIndex]) !== -1) {
+			startIndex++;
+		}
+		while (this.whiteSpaceChars.indexOf(str[endIndex - 1]) !== -1) {
+			endIndex--;
+		}
+		return str.slice(startIndex, endIndex);
+	}
+}
+Object.freeze(whiteSpaceRemover);
+
+//This function is supposed to be overridden by other scripts (if any) to control the behaviour of the quiz code entry modal and quiz submission
+var preQuizSubmissionFunction = function(qcinput, btn) {
+	btn.addEventListener("click", function() {
+		console.log(document.getElementById("bgmusicsrc").value)
+		sendquiz(
+			JSON.stringify(
+				new quizMetadataObject(
+					document.getElementById('quiztitle').value,
+					document.getElementById('bgmusic').checked,
+					document.getElementById('bgmusicsrc').value,
+					document.getElementById('dotimelimit').checked,
+					document.getElementById('doanswerbuzzers').checked,
+					document.getElementById('showgrade').checked,
+					document.getElementById('showgradecomment').checked,
+					document.getElementById('graderanges'),
+					document.getElementById('correctanswersrc').value,
+					document.getElementById('incorrectanswersrc').value,
+					document.getElementById('sendquizanswers').checked,
+					document.getElementById('quizanswersrecipientemail').value,
+					document.getElementById('showpoints').checked,
+					document.getElementById('privatequiz').checked,
+					document.getElementById('allowedquizparticipants').value.split('\n'),
+					Math.floor(Number(document.getElementById('quizagerestriction').value)),
+					document.getElementById('showcorrectanswers').checked
+				)
+			), new quizQuestionsObject(
+				document.getElementById('quizset')
+			)
+		, qcinput.value);
+	});
+	btn.textContent = 'Create the quiz!';
+
+	qcinput.type = 'text';
+	qcinput.placeholder = 'Set the code of your quiz here:';
+}
+
+var postQuizSubmissionFunction = function() {
+	alert("Quiz successfully created!");
+}
+
 function changeanswertype(questiontypediv, newtype) {
 	if (newtype === "text") {
 		questiontypediv.children[1].style.display = "inline";
@@ -114,7 +176,6 @@ document.addEventListener("DOMContentLoaded", function(e) {
 	//Set the click event for all expansion buttons
 	for (var elem of elems) {
 		elem.addEventListener("click", async function(e) {
-			console.log("Ugh!");
 			let moreOptionsDiv = elem.parentElement.querySelector("div.moreoptions");
 			if (elem.classList.contains("expanded")) {
 				//Must contract more options
@@ -170,7 +231,7 @@ document.addEventListener("DOMContentLoaded", function(e) {
 
 	doTimeLimit.addEventListener("change", function(e) {
 		//Do not cache this, even though it would have no implications due to it being a live list, which updates to reflect the DOM's latest state
-		var timelimitoptions = document.getElementsByClassName('timelimitoption');
+		var timelimitoptions = document.getElementsByClassName('questiontimelimit');
 		for (let i = 0; i < timelimitoptions.length; i++) {
 			timelimitoptions[i].disabled = !e.currentTarget.checked;
 		}
@@ -205,7 +266,7 @@ document.addEventListener("DOMContentLoaded", function(e) {
 
 	//Button to add a new grade range on click
 	addgraderange.addEventListener("click", function(e) {
-		addgraderange(e.currentTarget.parentElement);
+		addgraderangefunc(e.currentTarget.parentElement);
 	});
 
 	sendQuizAnswers.addEventListener("change", function(e) {
@@ -253,40 +314,13 @@ document.addEventListener("DOMContentLoaded", function(e) {
 		frameDiv.appendChild(promptSpan);
 
 		var qc = document.createElement('input');
-		qc.type = 'text';
-		qc.placeholder = 'Set the code of your quiz here:';
 		frameDiv.appendChild(qc);
 
 		var btn = document.createElement('button');
-		btn.addEventListener("click", function() {
-			sendquiz(
-				JSON.stringify(
-					new quizMetadataObject(
-						document.getElementById('quiztitle').value,
-						document.getElementById('bgmusic').checked,
-						document.getElementById('bgmusicsrc').value,
-						document.getElementById('dotimelimit').checked,
-						document.getElementById('doanswerbuzzers').checked,
-						document.getElementById('showgrade').checked,
-						document.getElementById('showgradecomment').checked,
-						document.getElementById('graderanges'),
-						document.getElementById('correctanswersrc').value,
-						document.getElementById('incorrectanswersrc').value,
-						document.getElementById('sendquizanswers').checked,
-						document.getElementById('quizanswersrecipientemail').value,
-						document.getElementById('showpoints').checked,
-						document.getElementById('privatequiz').checked,
-						document.getElementById('allowedquizparticipants').value.split('\n'),
-						Math.floor(Number(document.getElementById('quizagerestriction').value)),
-						document.getElementById('showcorrectanswers').checked
-					)
-				), new quizQuestionsObject(
-					document.getElementById('quizset')
-				)
-			, qc.value);
-		});
-		btn.textContent = 'Create the quiz!';
 		frameDiv.appendChild(btn);
+
+		//Data about the input and button elements is specified in this function, whose behaviour varies with mode (i.e.: creation/editing modes)
+		preQuizSubmissionFunction(qc, btn);
 
 
 		document.body.appendChild(bgDiv);
@@ -361,6 +395,8 @@ function addquestion(parentElem, presets = {}) {
 		question.getElementsByClassName("questionliteral")[0].value = presets.question;
 	}
 
+	question.getElementsByClassName("questiontimelimit")[0].disabled = !document.getElementById("dotimelimit").checked;
+
 	let questionType = question.getElementsByClassName("questiontype")[0];
 	questionType.addEventListener("change", function(e) {
 		var qtypediv = e.currentTarget.parentElement.getElementsByClassName("choices")[0];
@@ -422,10 +458,10 @@ function addquestion(parentElem, presets = {}) {
 	
 	//Specify default question time limit, answer message display time and points allotted per question (respectively) from preset if specified
 	if (presets.timeLimit !== undefined) {
-		question.getElementsByClassName("questiontimelimit")[0].value = presets.timeLimit;
+		question.getElementsByClassName("questiontimelimit")[0].value = Number(presets.timeLimit)/1000;
 	}
 	if (presets.messageDuration !== undefined) {
-		question.getElementsByClassName("answermessagetimelimit")[0].value = presets.messageDuration;
+		question.getElementsByClassName("answermessagetimelimit")[0].value = Number(presets.messageDuration)/1000;
 	}
 	if (presets.maxpoints !== undefined) {
 		question.getElementsByClassName("maxpoints")[0].value = presets.maxpoints;
@@ -477,17 +513,17 @@ function addquestion(parentElem, presets = {}) {
 	document.querySelector("#questionsinquiz").innerHTML = "Number of questions in the quiz: " + parentElem.querySelectorAll(".questionbit").length
 }
 
-function addgraderange(parentElem, presets = {}) {
+function addgraderangefunc(parentElem, presets = {}) {
 	var question = htmlparser.parseFromString(newgraderangehtmlstring, "text/html");
 
 	if (presets.min !== undefined) {
-		question.getElementsByClassName("mingrade").value = presets.min;
+		question.getElementsByClassName("mingrade")[0].value = presets.min;
 	}
 	if (presets.max !== undefined) {
-		question.getElementsByClassName("maxgrade").value = presets.max;
+		question.getElementsByClassName("maxgrade")[0].value = presets.max;
 	}
 	if (presets.comment !== undefined) {
-		question.getElementsByClassName("gradecomment").value = presets.comment;
+		question.getElementsByClassName("gradecomment")[0].innerHTML = presets.comment;
 	}
 
 	if (parentElem instanceof HTMLElement) {
@@ -498,6 +534,7 @@ function addgraderange(parentElem, presets = {}) {
 class quizMetadataObject {
 	constructor(quiztitle, bgmusic, bgmusicsrc, dotimelimit, answerbuzzers, showgrade, showgradecomment, gradecommentselem, correctanswerbuzzersrc, incorrectanswerbuzzersrc, sendAnswers, answersrecipient, showpoints, privatequiz, allowedparticipants, agerestriction, showcorrectanswers) {
 		this.quiztitle = quiztitle;
+		console.log(bgmusic, bgmusicsrc)
 		this.bgmusic = bgmusic;
 		if (bgmusic) {
 			this.bgmusicsrc = bgmusicsrc;
@@ -575,7 +612,7 @@ class quizQuestionsObject {
 					}
 				}
 			} else if (currentQuestionType === "textchoice") {
-				correctanswersarray.push(currentquestion.getElementsByClassName("correctanswer")[0].value);
+				correctanswersarray.push(whiteSpaceRemover.removeLeadingTrailingWhiteSpace(currentquestion.getElementsByClassName("correctanswer")[0].value));
 			}
 			this.questions.push({
 				question:currentquestion.getElementsByClassName("questionliteral")[0].value,
@@ -593,64 +630,101 @@ class quizQuestionsObject {
 	}
 }
 
-async function sendquiz(quizMetadataJSON, quizQuestions, quizcode) {
-		quizcode = encodeURIComponent(quizcode);
-		var xhr = new XMLHttpRequest();
-		console.log(quizcode);
-		xhr.open("POST", location.origin + "/sendnewquiz?qc=" + quizcode, true);
-		xhr.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
-		xhr.responseType = "text";
-		xhr.send(quizMetadataJSON);
-		await new Promise(function(res, rej) {
-			xhr.onload = res;
-			xhr.onerror = rej;
-		}).catch(function() {
-			try {
-				alert("Failed to create quiz: " + xhr.response.error);
-			} catch (e) {
-				alert("Failed to create quiz. (Error " + xhr.status + "). Please ensure that you are logged in to an account with a stable internet connection and try again");
-			}
-			throw "QuizCreationError: Failed to create quiz. XHR Status: " + xhr.status;
-		});
-		if (xhr.status === 200) {
-			try {
-				for (let i = 0; i < quizQuestions.questions.length; i++) {
-					//Must always be question-by-question for server-side question counting
-					socket.emit("quizQuestionStream", JSON.stringify(quizQuestions.questions[i]));
-					console.log(i, quizQuestions.questions[i]);
-					await new Promise(function(res, rej) {
-						var successHandler = function() {
-							//Make function remove outcome handlers from socket handlers list
+const QuizModes = {
+	CREATION: 0,
+	MODIFICATION: 1
+};
+
+async function sendquiz(quizMetadataJSON, quizQuestions, quizcode, mode = QuizModes.CREATION) {
+	quizcode = encodeURIComponent(quizcode);
+	var xhr = new XMLHttpRequest();
+	console.log(quizcode);
+	switch (mode) {
+		case QuizModes.CREATION:
+			xhr.open("POST", location.origin + "/sendnewquiz?qc=" + quizcode, true);
+			break;
+		case QuizModes.MODIFICATION:
+			xhr.open("PUT", location.origin + "/sendeditedquiz?qc=" + quizcode, true);
+			break;
+	}
+	xhr.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
+	xhr.responseType = "text";
+	xhr.send(quizMetadataJSON);
+	await new Promise(function(res, rej) {
+		xhr.onload = res;
+		xhr.onerror = rej;
+	}).catch(function() {
+		try {
+			alert("Failed to create quiz: " + xhr.response.error);
+		} catch (e) {
+			alert("Failed to create quiz. (Error " + xhr.status + "). Please ensure that you are logged in to an account with a stable internet connection and try again");
+		}
+		throw "QuizCreationError: Failed to create quiz. XHR Status: " + xhr.status;
+	});
+	if (xhr.status === 200) {
+		let p, data;
+		let numSendAttempts;
+		try {
+			for (let i = 0; i < quizQuestions.questions.length; i++) {
+				numSendAttempts = 0;
+				do {
+					let p = new Promise(function(res, rej) {
+						let removeListeners = function() {
 							socket.removeListener("streamwritecompleted", successHandler);
 							socket.removeListener("streamwritefailed", failureHandler);
+							clearTimeout(timeoutID);
+						}
+						var successHandler = function() {
+							//Make function remove outcome handlers from socket handlers list
+							removeListeners();
 							res();
 						}, failureHandler = function() {
 							//Make function remove outcome handlers from socket handlers list
-							socket.removeListener("streamwritecompleted", successHandler);
-							socket.removeListener("streamwritefailed", failureHandler);
+							removeListeners();
 							rej();
 						};
+						let timeoutID = setTimeout(function() {
+							removeListeners();
+							res({code: "socketTimeout", error: ""});
+						}, 5000);
 						socket.on("streamwritecompleted", successHandler);
 						socket.on("streamwritefailed", failureHandler)
 					});
+					socket.emit("quizQuestionStream", JSON.stringify(quizQuestions.questions[i]));
+					data = await p;
+					if (typeof data === "object") {
+						if (data.code !== "socketTimeout") {
+							break;
+						}
+					} else {
+						break;
+					}
+					numSendAttempts++;
+				} while (numSendAttempts < 10);
+				if (numSendAttempts === 10) {
+					throw new Error("Failed to stream data to server");
 				}
-				p = new Promise(function(res, rej) {
-					var successHandler = function() {
-						//Make function remove outcome handler from socket handlers list
-						socket.removeListener("quizfilestreamclose", successHandler);
-						res();
-					};
-					socket.on("quizfilestreamclose", successHandler);
-				});
-				//NEVER TRUST THE CLIENT - LISTEN FOR THIS SERVER-SIDE, BUT DO NOT RELY ON IT. HAVE A FALLBACK TO AUTOMATICALLY TERMINATE THe STREAM SESSION AFTER A FEW SECONDS OF INACTIVITY
-				socket.emit("endstream");
-				await p;
- 				alert("Quiz successfully created!");
-			} catch (e) {
-				alert("Failed to create quiz: " + e);
+				//Must always be question-by-question for server-side question counting
+				console.log(i, quizQuestions.questions[i]);
 			}
-		} else {
-			alert("Failed to create quiz: " + xhr.response);
+			p = new Promise(function(res, rej) {
+				var successHandler = function() {
+					//Make function remove outcome handler from socket handlers list
+					socket.removeListener("quizfilestreamclose", successHandler);
+					res();
+				};
+				socket.on("quizfilestreamclose", successHandler);
+			});
+			//NEVER TRUST THE CLIENT - LISTEN FOR THIS SERVER-SIDE, BUT DO NOT RELY ON IT. HAVE A FALLBACK TO AUTOMATICALLY TERMINATE THe STREAM SESSION AFTER A FEW SECONDS OF INACTIVITY
+			socket.emit("endstream");
+			await p;
+			postQuizSubmissionFunction();
+			//window.location.href = window.location.origin;
+		} catch (e) {
+			alert("Failed to create quiz: " + e);
 		}
-		console.log(xhr.status)
+	} else {
+		alert("Failed to create quiz: " + xhr.response);
+	}
+	console.log(xhr.status)
 }

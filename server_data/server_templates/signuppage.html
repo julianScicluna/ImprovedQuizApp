@@ -2,18 +2,37 @@
 	<head>
 		<title>Sign up to Quizdom!</title>
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
-		<link rel = "stylesheet" href="/server_data/server_pages/globalStyles.css"></link>
 		<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-gH2yIJqKdNHPEq0n4Mqa/HGKIhSkIHeL5AyhkYV8i59U5AR6csBvApHHNl/vI1Bx" crossorigin="anonymous">
+		<link rel = "stylesheet" href="/server_data/server_pages/globalStyles.css"></link>
 		<script src="/socket.io/socket.io.js"></script>
 		<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-A3rJD856KowSb7dwlZdYEkO39Gagi7vIsF0jrRAoQmDKKtQBHUuLZ9AsSv4jD4Xa" crossorigin="anonymous"></script>
 		<script src = "/server_data/server_pages/formatEncryptorDecryptor.js"></script>
 		<script language = "javascript">
-			var file;
+			var canvas;
+			var ctx;
 			var fileInputElement;
+			let isUsingProfilePicture = false;
 			document.addEventListener("DOMContentLoaded", function(e) {
+				canvas = document.getElementById("profilepicture")
+				ctx = canvas.getContext("2d");
+				console.log("DOM loaded!")
 				fileInputElement = document.getElementById("imageFileInput");
+				document.getElementById("signup").addEventListener("click", signUpButtonAsync);
+				document.getElementById("eye-password").addEventListener("click", function(e) {
+					var pwdelem = document.getElementById('password');
+					if (pwdelem.type === "password") {
+						pwdelem.type = "text";
+						e.currentTarget.children[1].classList.remove("hidden");
+						e.currentTarget.children[0].classList.add("hidden");
+					} else {
+						pwdelem.type = "password";
+						e.currentTarget.children[1].classList.add("hidden");
+						e.currentTarget.children[0].classList.remove("hidden");
+					}
+				});
+				document.getElementById("selectprofilepicture").addEventListener("click", selectprofilepicture);
+				document.getElementById("clearprofilepicture").addEventListener("click", removeprofilepicture);
 			}, {once: true});
-			
 			class IllegalArgumentError extends Error {
 				constructor(message = "", ...args) {
 					super(message, ...args);
@@ -37,8 +56,6 @@
 				await new Promise(function(res, rej) {
 					document.getElementById("hiddenimage").onload = res;
 				});
-				var canvas = document.getElementById("profilepicture");
-				var ctx = canvas.getContext("2d");
 				ctx.clearRect(0, 0, canvas.width, canvas.height);
 				ctx.drawImage(document.getElementById("hiddenimage"), 0, 0, canvas.width, canvas.height);
 				document.getElementById("hiddenimage").src = null;
@@ -52,7 +69,7 @@
 				stringifiedJSON = JSON.stringify({email:email, password:pwd, username:username, dateofbirth:birthdate, socketid});
 				let data = await multiDataFormatter.encode(["userData", "profilePic"], [stringifiedJSON, profilepic]);
 				console.log(data);
-				//send the stringified JSON and profile picture in one request
+				//Send the stringified JSON and profile picture in one request
 				xhr.send(data);
 				await new Promise(function(res, rej) {
 					xhr.onload = function() {
@@ -61,10 +78,9 @@
 						} else {
 							rej();
 						}
-					};
+					}
 					xhr.onerror = rej;
 				}).catch(function() {
-					window.req = xhr;
 					alert(xhr.response);
 					throw "SignUpError: " + xhr.response;
 				});
@@ -81,10 +97,13 @@
 				fileInputElement.click();
 				let files = await p;
 				if (files.length === 0) {
+					console.log("image retrieval aborted")
 					//User aborted the operation
+					return;
 				} else {
 					file = files[0];
 				}
+				isUsingProfilePicture = true;
 				/*var handle = await showOpenFilePicker({
 					types: [
 						{
@@ -112,89 +131,114 @@
 				await new Promise(function(res, rej) {
 					document.getElementById("hiddenimage").onload = res;
 				});
-				var canvas = document.getElementById("profilepicture");
-				var ctx = canvas.getContext("2d");
 				ctx.clearRect(0, 0, canvas.width, canvas.height);
 				ctx.drawImage(document.getElementById("hiddenimage"), 0, 0, canvas.width, canvas.height);
 				document.getElementById("hiddenimage").src = null;
 				URL.revokeObjectURL(url);
 			}
+			const removeprofilepicture = function() {
+				ctx.clearRect(0, 0, canvas.width, canvas.height);
+				isUsingProfilePicture = false;
+			}
 			async function signUpButtonAsync() {
-				var date = new Date(document.getElementById('dateofbirth').value);
-				signup(
-					document.getElementById('email').value,
-					document.getElementById('password').value,
-					document.getElementById('username').value,
-					`${("0000" + date.getFullYear().toString()).slice(-4)}-${("00" + date.getMonth().toString()).slice(-2)}-${("00" + date.getDay().toString()).slice(-2)}`,
-					await new Promise(function(res, rej) {
-						document.getElementById('profilepicture').toBlob(res, 'image/png', 0.9);
-					}),
-					socket.id
-				);
+				let username = document.getElementById("username");
+				let dateOfBirth = document.getElementById("dateofbirth");
+				let email = document.getElementById("email");
+				let password = document.getElementById("password");
+
+				let elems = [email, password, username, dateOfBirth];
+				let allFieldsFilledIn = true;
+
+				//Remove all of the classes BEFORE the forced reflow (layout thrash) and other loop, to register a change in class and retrigger the animation
+				for (var elem of elems) {
+					elem.parentElement.classList.remove("invalidFieldEntry");
+				}
+
+				//Force reflow (this is a getter and setter method in disguise; invoke Object.getOwnPropertyDescriptor(document.body, "offsetHeight") for more information)
+				document.body.offsetHeight;
+
+				//Check if either field is empty and add classes accordingly
+				for (var elem of elems) {
+					if (elem.value === "") {
+						elem.parentElement.style.setProperty("--field-error-value", "'This field is mandatory'");
+						elem.parentElement.classList.add("invalidFieldEntry");
+						allFieldsFilledIn = false;
+					}
+				}
+				if (allFieldsFilledIn) {
+					var date = new Date(dateOfBirth.value);
+					signup(
+						email.value,
+						password.value,
+						username.value,
+						`${("0000" + date.getFullYear().toString()).slice(-4)}-${("00" + (date.getMonth() + 1).toString()).slice(-2)}-${("00" + (date.getDate()).toString()).slice(-2)}`,
+						await new Promise(function(res, rej) {
+							if (isUsingProfilePicture) {
+								document.getElementById('profilepicture').toBlob(res, 'image/png', 0.9);
+							} else {
+								//Yield an empty blob
+								res(new Blob([]));
+							}
+						}),
+						socket.id
+					);
+				}
 			}
 		</script>
 	</head>
 	<body>
-		<input type = "file" id = "imageFileInput" class = "fileinput" accept = "image/*"></input>
-			<div class="container-fluid p-5" style="background-image:url('https://img.freepik.com/premium-vector/quiz-seamless-pattern-doodle-style-vector-illustration-back-school-background_501826-310.jpg?w=500'); background-repeat: repeat;">
-			   	<div class="mt-5"></div>
-					<div class="row align-items-center">
-			   			<div class="col"></div>
-						<div class="col align-self-center">
-								<div class="card">
-									<div class="card-body">
-											<div class="d-flex justify-content-center">
-												<img width="200" height="200" src="/server_data/server_media/tnqlogo.png" alt = "Quiz image" class="m-auto" />
-											</div>
-											<div class="mb-3">
-												<label for="email" class="form-label">Enter your email</label>
-							   					<input type="email" class="form-control" id="email" placeholder="Your email here:">
-											</div>
-											<div class="mb-3">
-												<label for="password" class="form-label">Enter your password</label>
-												<div class="input-group mb-3">
-														<input type="password" class="form-control" id="password"/>
-							   						<!-- TODO @jScicluna This is the hide password icon use js to toggle between hide/view -->
-								   					<button class="btn btn-outline-secondary" type="button" id="eye-password" onclick = "var pwdelem = document.getElementById('password'); if (pwdelem.type === 'password') {pwdelem.type = 'text'; this.children[1].style.display = 'inline-block'; this.children[0].style.display = 'none';} else {pwdelem.type = 'password'; this.children[1].style.display = 'none'; this.children[0].style.display = 'inline-block';}">
-																	<svg style = "display:inline;" xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
-																	<svg style = "display:none;" xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-																	<path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-							   										<path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-									   	  					</svg>
-													</button>
-							   					</div>
-											</div>
-											<div class="mb-3">
-												<label for="username" class="form-label">Enter your username</label>
-							   					<input type="text" class="form-control" id="username" placeholder="Your username here:">
-											</div>
-											<div class="mb-3">
-												<label for="dateofbirth" class="form-label">Enter your date of birth</label>
-							   					<input type="date" class="form-control" id="dateofbirth">
-											</div>
-											<div class="mb-3">
-												<button onclick = "selectprofilepicture()">Select profile picture...</button><br />
-								<select id = "profpicparams">
-									<option value = "male">Male</option>
-									<option value = "female">Female</option>
-									<option value = "adventurer">Adventurer</option>
-									<option value = "adventurer-neutral">Adventurer Neutral</option>
-									<option value = "avataaars">Avatar</option>
-									<option value = "micah">Micah</option>
-									<option value = "open-peeps">Open Peeps</option>
-									<option value = "pixel-art"></option>
-								</select>
-								<button onclick = "generateprofpic(document.getElementById('profpicparams').value, document.getElementById('username').value)">Get random profile pic...</button>
-								<canvas id = "profilepicture" width = "300" height = "300" style = "border-radius:150px;"></canvas>
-								<img id = "hiddenimage" width = "300" height = "300" style = "display:none;"></img>
-											</div>
-											<div class="text-center">
-												<a5 href="#" class="btn btn-primary" onclick = "signUpButtonAsync()" style="color:#00FF00; background-color:#0000FF; font-family:Consolas; font-size:30px;">Sign up!</a>
-											</div>
-									</div>
+		<input type = "file" id = "imageFileInput" class = "hidden" accept = "image/*"></input>
+		<div class="container-fluid p-5" style="background-image:url('https://img.freepik.com/premium-vector/quiz-seamless-pattern-doodle-style-vector-illustration-back-school-background_501826-310.jpg?w=500'); background-repeat: repeat;">
+			<div class="mt-5"></div>
+			<div class="row align-items-center">
+				<div class="col"></div>
+				<div class="col align-self-center">
+					<div class="card">
+						<div class="card-body">
+							<div class="d-flex justify-content-center">
+								<img width="200" height="200" src="/server_data/server_media/tnqlogo.png" alt = "Quiz image" class="m-auto" />
+							</div>
+							<div class="mb-3">
+								<label for="email" class="form-label">Enter your email</label>
+								<input type="email" class="form-control" id="email" placeholder="Your email here:">
+							</div>
+							<div class="mb-3">
+								<label for="password" class="form-label">Enter your password</label>
+								<div class="input-group mb-3">
+									<input type="password" class="form-control" id="password"/>
+									<!-- TODO @jScicluna This is the hide password icon use js to toggle between hide/view -->
+									<button class="btn btn-outline-secondary" type="button" id="eye-password">
+										<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+											<path stroke-linecap="round" stroke-linejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+										</svg>
+										<svg class = "hidden" xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+											<path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+											<path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+										</svg>
+									</button>
 								</div>
-				   		</div>
-				   		<div class="col"></div>
+							</div>
+							<div class="mb-3">
+								<label for="username" class="form-label">Enter your username</label>
+								<input type="text" class="form-control" id="username" placeholder="Your username here:">
+							</div>
+							<div class="mb-3">
+								<label for="dateofbirth" class="form-label">Enter your date of birth</label>
+								<input type="date" class="form-control" id="dateofbirth">
+							</div>
+							<div class="mb-3">
+								<button id = "clearprofilepicture">Remove profile picture...</button>
+								<button id = "selectprofilepicture">Select profile picture...</button>
+								<canvas id = "profilepicture" width = "300" height = "300"></canvas>
+								<img id = "hiddenimage" class = "hidden" width = "300" height = "300"></img>
+							</div>
+							<div class="text-center">
+								<button type = "button" class="btn btn-primary animatedButton" id = "signup">Sign up!</button>
+							</div>
+						</div>
+					</div>
+				</div>
+				<div class="col"></div>
 			</div>
 			<span style="font-size:10px;">Already have an account?&nbsp;<a href="/login">Log in!</a></span>
 			<div style="display: flex; justify-content: center; position: fixed; bottom: 25px; width: 100%;"><button onclick="window.location.href = window.location.origin + '/'">Home</button><button onclick="window.location.href = window.location.origin + '/login'">Log in</button><button onclick="window.location.href = window.location.origin + '/signup'">Sign up</button></div>

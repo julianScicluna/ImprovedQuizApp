@@ -1,10 +1,52 @@
 /**
- * This script must have all the properties of quizcreatorscript accessible to it. Modules sound like a viable approach...
+ * This script must have all the properties of quizcreatorscript accessible to it. Modules are beginning to sound like a viable approach...
  */
 
 let searchParams = new URLSearchParams(window.location.search);
 
 let quizCode = searchParams.get("qc");
+
+var preQuizSubmissionFunction = function(qcinput, btn) {
+	btn.addEventListener("click", function() {
+		let obj = new quizMetadataObject(
+			document.getElementById('quiztitle').value,
+			document.getElementById('bgmusic').checked,
+			document.getElementById('bgmusicsrc').value,
+			document.getElementById('dotimelimit').checked,
+			document.getElementById('doanswerbuzzers').checked,
+			document.getElementById('showgrade').checked,
+			document.getElementById('showgradecomment').checked,
+			document.getElementById('graderanges'),
+			document.getElementById('correctanswersrc').value,
+			document.getElementById('incorrectanswersrc').value,
+			document.getElementById('sendquizanswers').checked,
+			document.getElementById('quizanswersrecipientemail').value,
+			document.getElementById('showpoints').checked,
+			document.getElementById('privatequiz').checked,
+			document.getElementById('allowedquizparticipants').value.split('\n'),
+			Math.floor(Number(document.getElementById('quizagerestriction').value)),
+			document.getElementById('showcorrectanswers').checked
+		);
+		console.log(obj)
+		obj.qc = qcinput.value;
+		//TODO: Create appropriate method to do this for editing
+		sendquiz(
+			JSON.stringify(obj), new quizQuestionsObject(
+				document.getElementById('quizset')
+			)
+		, /*Insert the old quiz code here*/quizCode, QuizModes.MODIFICATION);
+	});
+	btn.textContent = 'Submit your changes!';
+
+	qcinput.type = 'text';
+	qcinput.placeholder = 'Change the code of your quiz here:';
+	qcinput.value = quizCode;
+}
+
+var postQuizSubmissionFunction = function() {
+	alert("Changes have been applied!");
+}
+
 
 //function to wait for a particular socket message within a given interval
 function createSocketResponsePromise(message, timeout = -1) {
@@ -42,7 +84,7 @@ async function getQuizData() {
     //Prepare the reference
     let latestPromise;
 
-    let res = await fetch(`/getQuizData?qc=${quizCode}&getquestions=1`, {
+    let res = await fetch(`/getQuizData?qc=${encodeURIComponent(quizCode)}&getquestions=1`, {
         method: "GET"
     });
 	if (res.status !== 200) {
@@ -122,7 +164,7 @@ let quizFillOnDOMLoad = function(quizData) {
 	let gradeRanges = quizData.quizMetadata.quizData.resultHTMLCommentRangesJSON;
 	for (let i = 0; i < gradeRanges.length; i++) {
 		//TODO: Insert grade range objects
-		addgraderange(gradeRangesDiv, gradeRanges[i]);
+		addgraderangefunc(gradeRangesDiv, gradeRanges[i]);
 	}
 
 	let doAnswerBuzzers = document.getElementById("doanswerbuzzers");

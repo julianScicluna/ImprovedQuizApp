@@ -1,19 +1,3 @@
-function loadModalStyleSheets() {
-	let modalStyleSheetsLink = document.createElement("link");
-	modalStyleSheetsLink.rel = "stylesheet";
-	modalStyleSheetsLink.href = "/server_data/server_pages/modal/modal.css";
-	document.head.appendChild(modalStyleSheetsLink);
-}
-
-if (document.readyState === "loading") {
-	document.addEventListener("DOMContentLoaded", function(e) {
-		//Import modal CSS style sheets
-		loadModalStyleSheets();
-	}, {once:true});
-} else {
-	loadModalStyleSheets();
-}
-
 class modal extends EventTarget {
 	#topclicked;
 	#sideclicked;
@@ -39,7 +23,7 @@ class modal extends EventTarget {
 		this.#parentModal = parentModal;
 		this.#destroyChildrenOnClose = destroyChildrenOnClose;
 		this.#childmodals = [];
-		this.destroy = async function() {
+		this.destroy = (async function() {
 			if (this.#childmodals.length === 0) {
 				var animation = modaldiv.animate([
 					// keyframes
@@ -83,7 +67,7 @@ class modal extends EventTarget {
 					await this.#signalUnDestroyable();
 				}
 			}
-		}
+		}).bind(this);
 		this.#closeAttemptFunctionReference = this.destroy;
 		this.#signalUnDestroyable = function() {
 			var parr = [];
@@ -268,11 +252,12 @@ class modal extends EventTarget {
 				//TODO: Verify the accuracy of the below lines of code
 				//This is due to the transition from absolute positioning to fixed positioning, which causes problems with scrolling
 				//Also note that translate is relative to the TOP-LEFT corner of the HTMLElement (unless otherwise specified by the transformation origin)
-console.log(e.clientX, e.clientY, this.#windowStats)
+//console.log(e.clientX, e.clientY, this.#windowStats);
 				//Do not forget to deduct 1 from both the X and Y values due to the border
 				modaldiv.style.translate = `${e.clientX - e.offsetX - 1}px ${e.clientY - e.offsetY - 1}px`;
 				this.#sideclicked = true;
 				document.documentElement.classList.add("noselect");
+				modaldiv.classList.add("nopanonphone");
 				this.#initclickpos = [
 					parseFloat(modaldiv.style.width.replace("px", "")),
 					parseFloat(modaldiv.style.height.replace("px", ""))
@@ -310,6 +295,7 @@ console.log(e.clientX, e.clientY, this.#windowStats)
 					modaldiv.style.translate = `${this.#windowStats.left}px ${this.#windowStats.top}px`;
 					this.#sideclicked = false;
 					document.documentElement.classList.remove("noselect");
+					modaldiv.classList.add("nopanonphone");
 					parentElem.appendChild(modaldiv);
 					this.#movingdiv.remove();
 					this.#movingdiv = null;
@@ -321,6 +307,7 @@ console.log(e.clientX, e.clientY, this.#windowStats)
 		modalbodydiv.addEventListener("pointerup", (function() {
 			this.#sideclicked = false;
 			document.documentElement.classList.remove("noselect");
+			modaldiv.classList.add("nopanonphone");
 		}).bind(this));
 		modaldiv.appendChild(modalbodydiv);
 
@@ -409,4 +396,72 @@ console.log(e.clientX, e.clientY, this.#windowStats)
 			return modalbodydiv;
 		}
 	}
+	static loadModalStyleSheets() {
+		let modalStyleSheetsLink = document.createElement("link");
+		modalStyleSheetsLink.rel = "stylesheet";
+		modalStyleSheetsLink.href = "/server_data/server_pages/modal/modal.css";
+		if (document.head === null) {
+			document.documentElement.insertBefore(document.createElement("head"), document.documentElement.firstChild);
+		}
+		document.head.appendChild(modalStyleSheetsLink);
+	}
+	
+	static initialiseStyleSheetObserver() {
+		//Load new style sheets in case old ones get destroyed
+		let modalStyleSheetObserver = new MutationObserver(function(mutationRecords, observer) {
+			let mustTraverseDocument = false;
+			for (let i = 0; i < mutationRecords.length; i++) {
+				if (mutationRecords[i].removedNodes.length > 0 || mutationRecords[i].type === "attributes") {
+					mustTraverseDocument = true;
+					break;
+				}
+			}
+			if (!mustTraverseDocument) {
+				return;
+			}
+			let modalStyleImporters = document.getElementsByTagName("link");
+			let styleElementExists = false;
+			for (let i = 0; i < modalStyleImporters.length; i++) {
+				if (modalStyleImporters[i].getAttribute("rel") === "stylesheet" && modalStyleImporters[i].getAttribute("href") === "/server_data/server_pages/modal/modal.css") {
+					styleElementExists = true;
+					return;
+				}
+			}
+			if (!styleElementExists) {
+				modal.loadModalStyleSheets();
+			}
+			/*for (let i = 0; i < mutationRecords.length; i++) {
+				for (let j = 0; j < mutationRecords[i].removedNodes.length; j++) {
+					if (mutationRecords[i].removedNodes[j].contains(document.body.childNodes[0])) {
+						console.log("Well, I'm dead!");
+					}
+				}
+			}*/
+		});
+		modalStyleSheetObserver.observe(document, {
+			attributes: true,
+			attributeFilter: ["href", "rel"],
+			childList: true,
+			subtree: true
+		});
+		return {
+			stop() {
+				return modalStyleSheetObserver.disconnect();
+			},
+			getObserver() {
+				return modalStyleSheetObserver;
+			}
+		}
+	}
+}
+
+if (document.readyState === "loading") {
+	document.addEventListener("DOMContentLoaded", function(e) {
+		//Import modal CSS style sheets
+		modal.loadModalStyleSheets();
+		modal.initialiseStyleSheetObserver();
+	}, {once:true});
+} else {
+	modal.loadModalStyleSheets();
+	modal.initialiseStyleSheetObserver();
 }

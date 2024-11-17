@@ -1571,7 +1571,7 @@ app.post("/signup", async function(req, res) {
 
 		//Have access to the db record mapped to the email through the primary key even though this is not needed due to)
 		mapModFuncs.insertSessionIDEmail(randomcode, obj.userData.email);
-		emailDBRecordMap.set(obj.userData.email, recordData.recordId);
+		emailDBRecordMap.set(obj.userData.email, recordData.insertId);
 		emailSocketIDMap.set(obj.userData.email, obj.userData.socketid);
 
 		res.cookie("sessionid", randomcode, {httpOnly:true, secure:cookiesRequireHTTPS, sameSite:"strict", maxAge:sessionDuration});
